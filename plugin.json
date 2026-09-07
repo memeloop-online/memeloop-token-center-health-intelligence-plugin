@@ -1,0 +1,128 @@
+{
+  "id": "health-intelligence-example",
+  "version": "0.1.0",
+  "wit_version": "0.2.0",
+  "wasm": null,
+  "capabilities": [
+    {
+      "kind": "http",
+      "allowed_origins": [
+        "https://health-intelligence.example.invalid",
+        "https://codexradar.com",
+        "https://deepswe.datacurve.ai",
+        "https://cdk.aixhan.com"
+      ]
+    }
+  ],
+  "contributions": {
+    "traffic_policy": false,
+    "request_rewrite": false,
+    "configuration": null,
+    "providers": [],
+    "service_data": [
+      {
+        "id": "health-intelligence",
+        "url": "https://health-intelligence.example.invalid/api/health-intelligence",
+        "required_scope": "metrics:read",
+        "response_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://memeloop.dev/examples/health-intelligence.schema.json",
+          "title": "Health and intelligence snapshot",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schemaVersion", "generatedAt", "sources"],
+          "properties": {
+            "schemaVersion": { "const": 1 },
+            "generatedAt": { "type": "string" },
+            "sources": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "$ref": "#/$defs/source" }
+            }
+          },
+          "$defs": {
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "label", "pageUrl", "endpoint", "status", "fetchedAt", "sourceUpdatedAt", "ageSeconds", "attempts", "error", "rows"],
+              "properties": {
+                "id": { "enum": ["codexradar", "deepswe", "aixhan"] },
+                "label": { "type": "string" },
+                "pageUrl": { "type": "string", "format": "uri" },
+                "endpoint": { "type": "string", "format": "uri" },
+                "status": { "enum": ["ok", "stale", "error"] },
+                "fetchedAt": { "type": "string" },
+                "sourceUpdatedAt": { "type": ["string", "null"] },
+                "ageSeconds": { "type": ["number", "null"], "minimum": 0 },
+                "attempts": { "type": "integer", "minimum": 0 },
+                "error": { "type": ["string", "null"] },
+                "rows": { "type": "array", "maxItems": 24 }
+              }
+            }
+          }
+        },
+        "fallback": {
+          "schemaVersion": 1,
+          "generatedAt": "1970-01-01T00:00:00.000Z",
+          "sources": [
+            {
+              "id": "codexradar",
+              "label": "Codex Radar",
+              "pageUrl": "https://codexradar.com/",
+              "endpoint": "https://codexradar.com/api/radar-insights",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            },
+            {
+              "id": "deepswe",
+              "label": "DeepSWE",
+              "pageUrl": "https://deepswe.datacurve.ai/",
+              "endpoint": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            },
+            {
+              "id": "aixhan",
+              "label": "AixHan model health",
+              "pageUrl": "https://cdk.aixhan.com/model-health",
+              "endpoint": "https://cdk.aixhan.com/api/public/check-cx/dashboard",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            }
+          ]
+        },
+        "cache_ttl_seconds": 300,
+        "timeout_millis": 4000,
+        "max_body_bytes": 1048576
+      }
+    ],
+    "operator_ui": [
+      {
+        "id": "health-and-intelligence",
+        "slot": "operator.sidebar.tab",
+        "category": { "id": "monitoring" },
+        "route": "health-intelligence",
+        "label": "Health and intelligence",
+        "icon": "heart",
+        "renderer": "typed_data_v1",
+        "data_endpoint": "health-intelligence"
+      }
+    ]
+  }
+}

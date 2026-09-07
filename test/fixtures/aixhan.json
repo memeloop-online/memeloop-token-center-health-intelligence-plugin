@@ -1,0 +1,47 @@
+{
+  "providerTimelines": [
+    {
+      "id": "provider-one",
+      "items": [
+        {
+          "id": "provider-one",
+          "name": "Example Team pool",
+          "type": "openai",
+          "model": "gpt-5.5",
+          "status": "degraded",
+          "latencyMs": 33824,
+          "pingLatencyMs": 160,
+          "checkedAt": "2026-09-07T15:43:22+08:00",
+          "message": "response slower than target"
+        },
+        {
+          "id": "provider-one",
+          "name": "Example Team pool",
+          "type": "openai",
+          "model": "gpt-5.5",
+          "status": "operational",
+          "latencyMs": 5514,
+          "pingLatencyMs": 158,
+          "checkedAt": "2026-09-07T15:27:07+08:00",
+          "message": "upstream responding"
+        }
+      ]
+    },
+    {
+      "id": "provider-two",
+      "items": [
+        {
+          "id": "provider-two",
+          "name": "Example fallback",
+          "type": "anthropic",
+          "model": "claude-opus",
+          "status": "operational",
+          "latencyMs": 420,
+          "pingLatencyMs": 80,
+          "checkedAt": "2026-09-07T15:40:00+08:00",
+          "message": "ok"
+        }
+      ]
+    }
+  ]
+}

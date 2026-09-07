@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import { normalizeAixHan, normalizeCodexRadar, normalizeDeepSwe } from '../src/server/normalizers.js';
+import { fixture } from './testUtils.js';
+
+describe('public source normalizers', () => {
+  it('keeps only bounded, typed Codex Radar intelligence rows', () => {
+    const result = normalizeCodexRadar(fixture('codexradar.json'));
+    expect(result.sourceUpdatedAt).toBe('2026-09-07T06:58:38.000Z');
+    expect(result.rows[0]).toMatchObject({ model: 'gpt-6-astra', effort: 'medium', iq: 111 });
+    expect(result.rows).toHaveLength(3);
+    expect(result.rows[0]).not.toHaveProperty('raw');
+  });
+
+  it('normalizes DeepSWE rates and efficiency metrics', () => {
+    const result = normalizeDeepSwe(fixture('deepswe.json'));
+    expect(result.sourceUpdatedAt).toBe('2026-09-03T22:24:37.984Z');
+    expect(result.rows[0]).toMatchObject({ model: 'gpt-6-astra', passRate: 0.7411504424778761, samples: 452 });
+    expect(result.rows[0]?.averageCostUsd).toBeCloseTo(6.5237);
+  });
+
+  it('selects the newest AixHan provider check and maps its public status', () => {
+    const result = normalizeAixHan(fixture('aixhan.json'));
+    expect(result.rows[0]).toMatchObject({ name: 'Example Team pool', status: 'degraded', latencyMs: 33824 });
+    expect(result.rows[0]?.checkedAt).toBe('2026-09-07T07:43:22.000Z');
+    expect(result.sourceUpdatedAt).toBe('2026-09-07T07:43:22.000Z');
+  });
+
+  it('does not let malformed rows escape as client data', () => {
+    const result = normalizeCodexRadar({ generated_at: '2026-09-07T00:00:00Z', comprehensive_points: [
+      { model: '<img>', effort: 'low', iq: 10, samples: 1 },
+      { model: 'missing-iq', effort: 'low', samples: 1 },
+    ] });
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.model).toBe('<img>');
+  });
+});

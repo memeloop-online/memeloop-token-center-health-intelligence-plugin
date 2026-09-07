@@ -1,0 +1,37 @@
+{
+  "scope": "Every DeepSWE rollout across imported Pier jobs",
+  "generated_at": "2026-09-03T22:24:37.984682+00:00",
+  "n_tasks_in_set": 113,
+  "rows": [
+    {
+      "model": "gpt-6-astra",
+      "reasoning_effort": "xhigh",
+      "pass_rate": 0.7411504424778761,
+      "pass_at_4": 0.8053097345132744,
+      "n_attempted": 452,
+      "mean_cost_usd": 6.5237735646,
+      "mean_output_tokens": 29557.3,
+      "mean_agent_steps": 29
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max",
+      "pass_rate": 0.73,
+      "pass_at_4": 0.82,
+      "n_attempted": 444,
+      "mean_cost_usd": 6.46,
+      "mean_output_tokens": 60000,
+      "mean_agent_steps": 61
+    },
+    {
+      "model": "gpt-5.5",
+      "reasoning_effort": "xhigh",
+      "pass_rate": 0.67,
+      "pass_at_4": 0.8,
+      "n_attempted": 400,
+      "mean_cost_usd": 7.23,
+      "mean_output_tokens": 46000,
+      "mean_agent_steps": 82
+    }
+  ]
+}

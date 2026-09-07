@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memeloop.dev/examples/health-intelligence.schema.json",
+  "title": "Health and intelligence snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "sources"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "pageUrl", "endpoint", "status", "fetchedAt", "sourceUpdatedAt", "ageSeconds", "attempts", "error", "rows"],
+      "properties": {
+        "id": { "enum": ["codexradar", "deepswe", "aixhan"] },
+        "label": { "type": "string" },
+        "pageUrl": { "type": "string", "format": "uri" },
+        "endpoint": { "type": "string", "format": "uri" },
+        "status": { "enum": ["ok", "stale", "error"] },
+        "fetchedAt": { "type": "string" },
+        "sourceUpdatedAt": { "type": ["string", "null"] },
+        "ageSeconds": { "type": ["number", "null"], "minimum": 0 },
+        "attempts": { "type": "integer", "minimum": 0 },
+        "error": { "type": ["string", "null"] },
+        "rows": { "type": "array", "maxItems": 24 }
+      }
+    }
+  }
+}

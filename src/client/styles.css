@@ -1,0 +1,82 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #e5edf4;
+  background: #071114;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-width: 320px;
+  background: radial-gradient(circle at 14% -8%, #16434a 0, transparent 38%), #071114;
+}
+
+button, a { font: inherit; }
+button {
+  border: 1px solid #4ec6b4;
+  border-radius: 3px;
+  padding: 9px 14px;
+  color: #03130f;
+  background: #58ccb9;
+  font-weight: 750;
+  cursor: pointer;
+}
+button:hover { background: #76dccd; }
+button:focus-visible, a:focus-visible { outline: 2px solid #9cf2e5; outline-offset: 3px; }
+
+#health-intelligence-root { width: min(1220px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 44px; }
+.tab-header { display: flex; align-items: end; justify-content: space-between; gap: 22px; margin-bottom: 22px; }
+.eyebrow { margin: 0 0 8px; color: #62d8c6; font-size: 10px; font-weight: 800; letter-spacing: .18em; }
+h1 { margin: 0; font: 400 clamp(29px, 4vw, 43px)/1.1 Georgia, serif; letter-spacing: -.025em; }
+.lede { margin: 9px 0 0; color: #8da3aa; font-size: 14px; }
+.source-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.source-card { min-width: 0; padding: 17px; border: 1px solid #263c42; background: #0a181c; box-shadow: 0 18px 50px #0004; }
+.source-card.ok { border-top: 2px solid #3dc5a9; }
+.source-card.stale { border-top: 2px solid #dab35c; }
+.source-card.error { border-top: 2px solid #dc7272; }
+.source-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+h2 { margin: 0; font: 400 21px/1.2 Georgia, serif; }
+.source-updated { margin: 5px 0 0; color: #779097; font-size: 11px; }
+.source-status, .health-pill { display: inline-block; border: 1px solid; padding: 4px 7px; color: #8ad8c7; font-size: 10px; white-space: nowrap; }
+.source-status.stale { color: #e2c170; }
+.source-status.error { color: #ef9292; }
+.source-body { margin-top: 18px; }
+.bar-row { margin: 12px 0 0; }
+.bar-heading { display: flex; justify-content: space-between; gap: 8px; color: #a9bbc0; font-size: 12px; }
+.bar-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-heading b { flex: 0 0 auto; color: #e4f4f0; font-weight: 700; }
+.bar-track { height: 4px; margin-top: 7px; background: #1b3035; }
+.bar-track i { display: block; height: 100%; background: linear-gradient(90deg, #3bb49f, #80e0d1); }
+.row-note { display: block; margin-top: 4px; color: #6f858b; font-size: 10px; line-height: 1.45; }
+.health-list { display: grid; gap: 8px; }
+.health-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; padding: 9px 0; border-bottom: 1px solid #1b3035; }
+.health-row b, .health-row small { display: block; overflow-wrap: anywhere; }
+.health-row b { font-size: 12px; }
+.health-row small { color: #789198; font-size: 10px; }
+.health-row .row-note { grid-column: 1 / -1; }
+.health-pill.operational { color: #7ddfba; border-color: #2a6655; }
+.health-pill.degraded { color: #e4c270; border-color: #705a2d; }
+.health-pill.error { color: #ed8c8c; border-color: #733737; }
+.health-pill.unknown { color: #a9b4b7; border-color: #4a595c; }
+.source-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 11px; margin-top: 18px; color: #6f858b; font: 10px ui-monospace, SFMono-Regular, monospace; }
+.source-footer a { color: #7ed8c9; text-decoration: none; }
+.source-footer a:hover { text-decoration: underline; }
+.source-error { margin: 15px 0 0; color: #ed9696; font-size: 12px; }
+.notice { margin: 0 0 14px; padding: 11px 13px; border: 1px solid #6c5a2e; background: #261f10; color: #e2c272; font-size: 12px; }
+.notice.error { border-color: #733d3d; background: #291314; color: #ef9898; }
+.notice button { margin-top: 8px; }
+.notice p { margin: 0; }
+.loading, .empty { color: #7c9298; }
+.disclaimer { margin: 17px 0 0; color: #6f858b; font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  #health-intelligence-root { width: min(700px, calc(100% - 24px)); padding-top: 24px; }
+  .source-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .tab-header { align-items: stretch; flex-direction: column; gap: 14px; }
+  .tab-header button { align-self: start; }
+}
