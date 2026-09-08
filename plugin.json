@@ -1,6 +1,6 @@
 {
   "id": "health-intelligence-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "wit_version": "0.2.0",
   "wasm": null,
   "capabilities": [
@@ -121,6 +121,7 @@
         "label": "Health and intelligence",
         "icon": "heart",
         "renderer": "typed_data_v1",
+        "presentation": "health_intelligence_v1",
         "data_endpoint": "health-intelligence"
       }
     ]

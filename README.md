@@ -52,6 +52,7 @@ be stale, incomplete, or unavailable.
       "label": "Health and intelligence",
       "icon": "heart",
       "renderer": "typed_data_v1",
+      "presentation": "health_intelligence_v1",
       "data_endpoint": "health-intelligence"
     }]
   }
@@ -75,6 +76,7 @@ Contract decisions now aligned with core:
 | `contributions.operator_ui` | One `operator.sidebar.tab` in core category `monitoring` |
 | `data_endpoint` | Same-plugin service-data ID; never a browser URL |
 | `renderer` | Core-owned `typed_data_v1` |
+| `presentation` | Closed core-owned `health_intelligence_v1` view; no plugin browser code |
 | `required_scope` | Existing `metrics:read` read scope |
 | Service limits | 300-second cache, 4-second timeout, 1 MiB body cap |
 | Fallback | Schema-valid snapshot with all three sources marked unavailable |

@@ -1,6 +1,6 @@
 {
   "name": "@memeloop/health-intelligence-plugin-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A read-only Token Center Monitoring contribution example for public model-health signals",
   "type": "module",
   "engines": {

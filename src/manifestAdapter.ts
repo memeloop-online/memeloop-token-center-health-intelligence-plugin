@@ -1,11 +1,12 @@
 /**
  * Adapter for the core operator-contribution v1 contract from product commit
- * 8febaf59e06f06f212cf8f01776455276c60380a.  The core owns the renderer and
+ * 8dc98f59d05f25354d1f19971a662a264a9177e4. The core owns the renderer and
  * calls the named service-data endpoint; this package never asks the browser
  * to load a plugin script, document, stylesheet, or iframe.
  */
 
 export const CORE_UI_CONTRACT = 'typed_data_v1';
+export const HEALTH_INTELLIGENCE_PRESENTATION = 'health_intelligence_v1';
 export const HEALTH_INTELLIGENCE_PLUGIN_ID = 'health-intelligence-example';
 export const HEALTH_INTELLIGENCE_TAB_ID = 'health-and-intelligence';
 export const HEALTH_INTELLIGENCE_ENDPOINT_ID = 'health-intelligence';
@@ -30,6 +31,7 @@ export interface HealthIntelligenceTabContribution {
   readonly label: 'Health and intelligence';
   readonly icon: 'heart';
   readonly renderer: 'typed_data_v1';
+  readonly presentation: typeof HEALTH_INTELLIGENCE_PRESENTATION;
   readonly dataEndpoint: typeof HEALTH_INTELLIGENCE_ENDPOINT_ID;
 }
 
@@ -121,6 +123,7 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     || candidate.label !== 'Health and intelligence'
     || candidate.icon !== 'heart'
     || candidate.renderer !== CORE_UI_CONTRACT
+    || candidate.presentation !== HEALTH_INTELLIGENCE_PRESENTATION
     || candidate.data_endpoint !== HEALTH_INTELLIGENCE_ENDPOINT_ID
     || Object.prototype.hasOwnProperty.call(candidate, 'entry')
     || Object.prototype.hasOwnProperty.call(candidate, 'remote_content')) {
@@ -134,6 +137,7 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     label: 'Health and intelligence',
     icon: 'heart',
     renderer: 'typed_data_v1',
+    presentation: HEALTH_INTELLIGENCE_PRESENTATION,
     dataEndpoint: HEALTH_INTELLIGENCE_ENDPOINT_ID,
   };
 }

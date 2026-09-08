@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   HEALTH_INTELLIGENCE_ENDPOINT_ID,
+  HEALTH_INTELLIGENCE_PRESENTATION,
   HEALTH_INTELLIGENCE_SERVICE_URL,
   ManifestContractError,
   readHealthIntelligenceManifest,
@@ -22,6 +23,7 @@ describe('core contribution adapter', () => {
       label: 'Health and intelligence',
       icon: 'heart',
       renderer: 'typed_data_v1',
+      presentation: HEALTH_INTELLIGENCE_PRESENTATION,
       dataEndpoint: HEALTH_INTELLIGENCE_ENDPOINT_ID,
     });
     expect(result.serviceData).toMatchObject({
