@@ -36,9 +36,10 @@ WebAssembly component，不是 JavaScript 服务或远程页面。插件严格�
 
 ## Compatibility / 兼容性
 
-CI currently targets reviewed MTC pull request
-[`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326) at
-source revision `b9ba6603d23c61d943c83b619acb2c7883a19776`. Active mode requires
+CI and release verification pin the merged MTC
+[`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326)
+contract at source revision `48465eaf751ef479122ac262806a22ada15c37eb`.
+Active mode requires
 the complete short-window runtime contract and database migration 104
 (`transient_health_signal_windows`), in addition to the original durable
 `group-routing-v2` contract from #320. The WIT package remains
@@ -47,25 +48,28 @@ the complete short-window runtime contract and database migration 104
 [`wit/token-center.wit`](wit/token-center.wit) must remain byte-identical to the
 pinned host revision.
 
-CI 当前固定到 MTC PR #326 的上述受审 revision。active 模式除 #320 的持久化
+CI 和发布验证固定到 MTC PR #326 合并后的上述受审 revision。active 模式除 #320 的持久化
 `group-routing-v2` 契约外，还明确依赖完整 short-window runtime 和数据库 migration
 104（`transient_health_signal_windows`）。WIT 包版本仍为 `0.2.0`；本仓库不包含主仓库
 迁移工具、数据库迁移或部署配置。
 
-No compatible official installer has been published from a revision containing
-migration 104 yet. Therefore this repository is not currently publishable or
-installable: [`release/mtc-installer-trust.json`](release/mtc-installer-trust.json)
-is intentionally `blocked`. A release maintainer must wait for #326 to merge,
-publish the official installer from a post-merge revision, verify its digest and
-source revision, and update the trust file in review before publication can run.
+The official installer produced and verified by MTC push CI run
+[`35272302784`](https://github.com/memeloop-online/memeloop-token-center/actions/runs/35272302784)
+is pinned by immutable digest in
+[`release/mtc-installer-trust.json`](release/mtc-installer-trust.json). Its OCI
+revision is the same `48465eaf…` merge commit, and the image contains the
+reviewed patched Cosign `v3.1.3-mtc.3`. Plugin publication remains a separate,
+manual action after this trust-ready change is reviewed and merged.
 
-目前尚无包含 migration 104 的官方 installer 发布物，因此本仓库现在不可发布、不可
-安装；trust 文件被有意标为 `blocked`。必须等待 #326 合并并从 post-merge revision
-发布官方 installer，验证其 digest/source revision 后，再通过评审更新 trust pin。
+MTC push CI run
+[`35272302784`](https://github.com/memeloop-online/memeloop-token-center/actions/runs/35272302784)
+已发布并验证官方 installer；本仓库在 trust 文件中按不可变 digest 固定该制品。它的
+OCI revision 与上述 `48465eaf…` merge commit 一致，并内置受审 patched Cosign
+`v3.1.3-mtc.3`。插件发布仍是独立的手动操作，必须等待本次 trust-ready 变更评审并合并。
 
 ## Release and installation / 发布与安装
 
-Once a compatible installer pin is reviewed and marked `ready`, the manual
+With the compatible installer pin reviewed and marked `ready`, the manual
 `publish` GitHub Actions workflow builds and tests the component,
 publishes the exact `plugin.json` and `plugin.wasm` as MTC OCI media types,
 captures the registry digest, signs that digest with GitHub OIDC/Cosign, verifies
@@ -73,19 +77,20 @@ the exact workflow identity, then reinstalls the signed digest with MTC's
 official digest-pinned installer. Publication fails closed if OIDC, package
 write access, the workflow token, the reviewed installer digest, signature
 verification, manifest validation, or byte-for-byte reinstall comparison is
-unavailable. Its first trust-resolution step fails immediately while the trust
-file is `blocked`; it cannot push an unsigned or unverifiable candidate. No
-signing key or fallback secret is checked into this repository.
+unavailable. If a future review returns the trust file to `blocked`, the first
+trust-resolution step fails immediately; it cannot push an unsigned or
+unverifiable candidate. No signing key or fallback secret is checked into this
+repository.
 
-只有受审兼容 installer pin 标为 `ready` 后，手动 `publish` workflow 才会构建并测试
+受审兼容 installer pin 标为 `ready` 后，手动 `publish` workflow 才会构建并测试
 组件，以 MTC OCI media type 发布精确的
 `plugin.json` 与 `plugin.wasm`，取得 registry digest 后使用 GitHub OIDC/Cosign
 签名并校验精确 workflow identity，最后用 MTC 官方 digest-pinned installer 回装。
 OIDC、包写权限、workflow token、受审 installer digest、签名校验、manifest 校验或
-逐字节回装任一步不可用时都会失败关闭。trust 为 `blocked` 时第一步就立即失败，不能
-推送未签名或不可验证候选；仓库不保存签名私钥或伪造 secret。
+逐字节回装任一步不可用时都会失败关闭。若后续评审把 trust 恢复为 `blocked`，第一步
+就会立即失败，不能推送未签名或不可验证候选；仓库不保存签名私钥或伪造 secret。
 
-After trust is unlocked and a workflow succeeds, use only the digest reference
+After the trust-ready change is merged and a publish workflow succeeds, use only the digest reference
 recorded in its `plugin-release.json` evidence:
 
 ```text
