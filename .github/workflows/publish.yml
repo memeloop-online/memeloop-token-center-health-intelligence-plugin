@@ -1,0 +1,187 @@
+name: publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mtc-transient-health
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/master' && github.repository == 'memeloop-online/memeloop-token-center-health-intelligence-plugin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      PLUGIN_ID: mtc-transient-health
+      PLUGIN_SOURCE: ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin
+      SIGNING_IDENTITY: https://github.com/memeloop-online/memeloop-token-center-health-intelligence-plugin/.github/workflows/publish.yml@refs/heads/master
+      SIGNING_ISSUER: https://token.actions.githubusercontent.com
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+      - name: Resolve reviewed installer and tool trust
+        run: |
+          node scripts/verify-static.mjs
+          node <<'NODE'
+          const { appendFileSync, readFileSync } = require('node:fs');
+          const trust = JSON.parse(readFileSync('release/mtc-installer-trust.json', 'utf8'));
+          appendFileSync(process.env.GITHUB_ENV, [
+            `INSTALLER_SOURCE=${trust.installer_repository}`,
+            `INSTALLER_DIGEST=${trust.installer_digest}`,
+            `INSTALLER_SOURCE_REVISION=${trust.installer_source_revision}`,
+            `COSIGN_VERSION=${trust.cosign_version}`,
+          ].join('\n') + '\n');
+          NODE
+      - name: Checkout the pinned MTC host contract
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: memeloop-online/memeloop-token-center
+          ref: 76d0a5e9dd9788b486f3e053d740596d7da80a3d
+          path: mtc-core
+          persist-credentials: false
+      - name: Verify pinned WIT and group-routing-v2 schema support
+        run: node scripts/verify-static.mjs "$GITHUB_WORKSPACE/mtc-core"
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable action
+        with:
+          toolchain: 1.95.0
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+      - uses: oras-project/setup-oras@ccb71166b124a8452d1b72c4476398a909ed4d63 # main (reviewed immutable commit)
+        with:
+          version: 1.3.0
+      - name: Require workflow registry authority
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test -n "$REGISTRY_TOKEN"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_URL"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Require the reviewed official installer and patched Cosign
+        run: |
+          docker pull "$INSTALLER_SOURCE@$INSTALLER_DIGEST"
+          actual_revision=$(docker image inspect "$INSTALLER_SOURCE@$INSTALLER_DIGEST" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+          test "$actual_revision" = "$INSTALLER_SOURCE_REVISION"
+          docker run --rm --entrypoint /usr/local/bin/install-plugin-oci \
+            "$INSTALLER_SOURCE@$INSTALLER_DIGEST" --help | grep -- --cosign-certificate-identity
+          container=$(docker create "$INSTALLER_SOURCE@$INSTALLER_DIGEST")
+          trap 'docker rm "$container" >/dev/null' EXIT
+          mkdir -p "$RUNNER_TEMP/plugin-tools"
+          docker cp "$container:/usr/local/bin/cosign" "$RUNNER_TEMP/plugin-tools/cosign"
+          chmod 0555 "$RUNNER_TEMP/plugin-tools/cosign"
+          actual_cosign=$("$RUNNER_TEMP/plugin-tools/cosign" version --json | node -e '
+            let value=""; process.stdin.on("data", chunk => value += chunk);
+            process.stdin.on("end", () => process.stdout.write(JSON.parse(value).gitVersion));')
+          test "$actual_cosign" = "$COSIGN_VERSION"
+          echo "$RUNNER_TEMP/plugin-tools" >> "$GITHUB_PATH"
+      - name: Test and build the locked component
+        env:
+          CARGO_BUILD_JOBS: 2
+          CARGO_PROFILE_TEST_DEBUG: 0
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo build --locked --release --target wasm32-unknown-unknown
+      - name: Install reviewed wasm-tools and assemble the package
+        run: |
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/bytecodealliance/wasm-tools/releases/download/v1.252.0/wasm-tools-1.252.0-x86_64-linux.tar.gz \
+            --output "$RUNNER_TEMP/wasm-tools.tar.gz"
+          echo '097b1181d5b2bc3f2ebc44b4e72edf18308902023f1f1483a1a7dc1268ea988d  '"$RUNNER_TEMP/wasm-tools.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/wasm-tools.tar.gz" -C "$RUNNER_TEMP/plugin-tools" --strip-components=1
+          mkdir -p "$RUNNER_TEMP/plugin-package"
+          "$RUNNER_TEMP/plugin-tools/wasm-tools" component new \
+            target/wasm32-unknown-unknown/release/mtc_transient_health.wasm \
+            -o "$RUNNER_TEMP/plugin-package/plugin.wasm"
+          "$RUNNER_TEMP/plugin-tools/wasm-tools" validate --features component-model \
+            "$RUNNER_TEMP/plugin-package/plugin.wasm"
+          cp plugin.json README.md "$RUNNER_TEMP/plugin-package/"
+          printf '{"format_version":1}\n' > "$RUNNER_TEMP/plugin-package/config.json"
+      - name: Publish exact MTC OCI media types
+        working-directory: ${{ runner.temp }}/plugin-package
+        run: |
+          oras push "$PLUGIN_SOURCE:sha-$GITHUB_SHA" \
+            --artifact-type application/vnd.memeloop.token-center.plugin.v1 \
+            --config config.json:application/vnd.memeloop.token-center.plugin.config.v1+json \
+            --annotation "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "org.opencontainers.image.revision=$GITHUB_SHA" \
+            plugin.json:application/vnd.memeloop.token-center.plugin.manifest.v1+json \
+            plugin.wasm:application/vnd.wasm.content.layer.v1+wasm \
+            README.md:application/vnd.memeloop.token-center.plugin.asset.v1 \
+            --format json > "$RUNNER_TEMP/plugin-push.json"
+          digest=$(node -e '
+            const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+            if (!/^sha256:[0-9a-f]{64}$/.test(value.digest)) process.exit(1);
+            process.stdout.write(value.digest);' "$RUNNER_TEMP/plugin-push.json")
+          echo "PLUGIN_DIGEST=$digest" >> "$GITHUB_ENV"
+      - name: Sign and verify the exact GitHub OIDC identity
+        run: |
+          cosign sign --yes "$PLUGIN_SOURCE@$PLUGIN_DIGEST"
+          cosign verify \
+            --certificate-identity "$SIGNING_IDENTITY" \
+            --certificate-oidc-issuer "$SIGNING_ISSUER" \
+            "$PLUGIN_SOURCE@$PLUGIN_DIGEST" > "$RUNNER_TEMP/plugin-signature-verification.json"
+          oras manifest fetch "$PLUGIN_SOURCE@$PLUGIN_DIGEST" \
+            --output "$RUNNER_TEMP/plugin-oci-manifest.json"
+      - name: Reinstall signed bytes with the official MTC installer
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          test -n "$REGISTRY_USERNAME"
+          test -n "$REGISTRY_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/plugin-install" "$RUNNER_TEMP/plugin-registry"
+          umask 077
+          printf '%s' "$REGISTRY_USERNAME" > "$RUNNER_TEMP/plugin-registry/username"
+          printf '%s' "$REGISTRY_PASSWORD" > "$RUNNER_TEMP/plugin-registry/password"
+          sudo chown -R 10001:10001 "$RUNNER_TEMP/plugin-registry"
+          sudo chown 10001:10001 "$RUNNER_TEMP/plugin-install"
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+            --mount "type=bind,src=$RUNNER_TEMP/plugin-install,dst=/plugins" \
+            --mount "type=bind,src=$RUNNER_TEMP/plugin-registry,dst=/registry,readonly" \
+            --entrypoint /usr/local/bin/install-plugin-oci \
+            "$INSTALLER_SOURCE@$INSTALLER_DIGEST" \
+            "$PLUGIN_SOURCE@$PLUGIN_DIGEST" \
+            --plugin-dir /plugins \
+            --allowed-source "$PLUGIN_SOURCE" \
+            --cosign-certificate-identity "$SIGNING_IDENTITY" \
+            --cosign-certificate-oidc-issuer "$SIGNING_ISSUER" \
+            --registry-username-file /registry/username \
+            --registry-password-file /registry/password \
+            > "$RUNNER_TEMP/plugin-installation.json"
+          cmp "$RUNNER_TEMP/plugin-package/plugin.json" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/plugin.json"
+          cmp "$RUNNER_TEMP/plugin-package/plugin.wasm" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/plugin.wasm"
+          cmp "$RUNNER_TEMP/plugin-package/README.md" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/README.md"
+          node scripts/verify-release.mjs "$RUNNER_TEMP"
+      - name: Preserve digest, signature, manifest, component and reinstall evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4
+        with:
+          name: mtc-transient-health-release-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/plugin-release.json
+            ${{ runner.temp }}/plugin-oci-manifest.json
+            ${{ runner.temp }}/plugin-signature-verification.json
+            ${{ runner.temp }}/plugin-installation.json
+            ${{ runner.temp }}/plugin-package/plugin.json
+            ${{ runner.temp }}/plugin-package/plugin.wasm
+            ${{ runner.temp }}/plugin-package/README.md
+            ${{ runner.temp }}/plugin-install/mtc-transient-health/.mtc-oci-install.json
+          if-no-files-found: error
+          retention-days: 90

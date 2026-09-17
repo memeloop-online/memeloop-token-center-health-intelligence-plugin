@@ -1,7 +1,6 @@
-node_modules/
-dist/
-coverage/
+/target/
+/plugin.wasm
+/release-evidence/
+*.log
 .env
 .env.*
-!.env.example
-*.log
