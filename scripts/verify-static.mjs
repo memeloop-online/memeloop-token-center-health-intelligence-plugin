@@ -110,6 +110,10 @@ if (coreRoot) {
   const routing = readFileSync(join(coreRoot, 'src/plugin/routing.rs'), 'utf8');
   assert(routing.includes('DEFAULT_TRANSIENT_HEALTH_WINDOW_MS: u64 = 60_000'));
   assert(routing.includes('MAX_TRANSIENT_HEALTH_WINDOW_MS: u64 = 300_000'));
+  assert(routing.includes('V2 shadow policy is observational only'));
+  const groupRouting = readFileSync(join(coreRoot, 'src/group_routing.rs'), 'utf8');
+  assert(groupRouting.includes('health_directives_enabled'));
+  assert(groupRouting.includes('return (core, native_recheck)'));
 }
 
 function jsonFrom(path) {

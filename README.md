@@ -38,7 +38,7 @@ WebAssembly component，不是 JavaScript 服务或远程页面。插件严格�
 
 CI currently targets reviewed MTC pull request
 [`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326) at
-source revision `aca14f12a8522b817b8463c237ae6d6c5f04cb76`. Active mode requires
+source revision `b9ba6603d23c61d943c83b619acb2c7883a19776`. Active mode requires
 the complete short-window runtime contract and database migration 104
 (`transient_health_signal_windows`), in addition to the original durable
 `group-routing-v2` contract from #320. The WIT package remains

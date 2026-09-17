@@ -3,7 +3,7 @@
   "status": "blocked",
   "blocking_reason": "No published official installer currently contains the post-migration-104 short-window group-routing-v2 host contract. Pin a verified post-merge installer before publication.",
   "core_repository": "https://github.com/memeloop-online/memeloop-token-center",
-  "core_revision": "aca14f12a8522b817b8463c237ae6d6c5f04cb76",
+  "core_revision": "b9ba6603d23c61d943c83b619acb2c7883a19776",
   "required_migration": 104,
   "installer_repository": "ghcr.io/memeloop-online/memeloop-token-center-plugin-installer",
   "installer_digest": null,
