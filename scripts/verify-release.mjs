@@ -60,6 +60,9 @@ assert(verification.some((entry) =>
   entry.critical?.image?.['docker-manifest-digest'] === expectedDigest));
 
 const trust = JSON.parse(readFileSync(join(repositoryRoot, 'release/mtc-installer-trust.json'), 'utf8'));
+assert.equal(trust.status, 'ready');
+assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
+assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
 const evidence = {
   format_version: 1,
   plugin_id: packageManifest.id,

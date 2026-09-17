@@ -21,12 +21,14 @@ assert.equal(contribution.schema.type, 'object');
 assert.equal(contribution.schema.additionalProperties, false);
 
 const required = [
-  'transient_health_mode', 'min_samples', 'open_micros', 'recover_micros',
-  'min_probe_successes', 'cooldown_ms', 'recovery_wait_ms', 'recheck_ms',
+  'transient_health_mode', 'transient_health_window_ms', 'min_samples',
+  'open_micros', 'recover_micros', 'min_probe_successes', 'cooldown_ms',
+  'recovery_wait_ms', 'recheck_ms',
 ];
 assert.deepEqual(contribution.schema.required, required);
 assert.deepEqual(Object.keys(contribution.default), required);
 assert.equal(contribution.default.transient_health_mode, 'shadow');
+assert.equal(contribution.default.transient_health_window_ms, 60_000);
 assert(contribution.default.recover_micros <= contribution.default.open_micros);
 for (const field of required) {
   const schema = contribution.schema.properties[field];
@@ -38,9 +40,19 @@ for (const field of required) {
 }
 
 assert.equal(trust.format_version, 1);
+assert(['blocked', 'ready'].includes(trust.status));
+assert.equal(trust.required_migration, 104);
 assert.match(trust.core_revision, /^[0-9a-f]{40}$/);
-assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
-assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
+if (trust.status === 'blocked') {
+  assert.equal(typeof trust.blocking_reason, 'string');
+  assert(trust.blocking_reason.length > 0);
+  assert.equal(trust.installer_digest, null);
+  assert.equal(trust.installer_source_revision, null);
+} else {
+  assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
+  assert.notEqual(trust.installer_source_revision, 'c8b68028a21e80a610b74ee3c41b442a69b84f97');
+}
 assert.equal(trust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
 assert.equal(trust.cosign_version, 'v3.1.3-mtc.3');
 assert.match(trust.wasm_tools_sha256, /^[0-9a-f]{64}$/);
@@ -92,6 +104,12 @@ if (coreRoot) {
   const versions = coreManifestSchema.properties.contributions.properties.group_routing
     .properties.version.enum;
   assert(versions.includes('group-routing-v2'), 'pinned MTC schema lacks group-routing-v2');
+  const migration104 = readFileSync(join(coreRoot, 'migrations/common/0104_transient_health_signal_windows.sql'), 'utf8');
+  assert(migration104.includes('transient_window_ms'));
+  assert(migration104.includes('window_started_at'));
+  const routing = readFileSync(join(coreRoot, 'src/plugin/routing.rs'), 'utf8');
+  assert(routing.includes('DEFAULT_TRANSIENT_HEALTH_WINDOW_MS: u64 = 60_000'));
+  assert(routing.includes('MAX_TRANSIENT_HEALTH_WINDOW_MS: u64 = 300_000'));
 }
 
 function jsonFrom(path) {

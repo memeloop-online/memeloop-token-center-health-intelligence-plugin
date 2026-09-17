@@ -13,6 +13,7 @@
         "additionalProperties": false,
         "required": [
           "transient_health_mode",
+          "transient_health_window_ms",
           "min_samples",
           "open_micros",
           "recover_micros",
@@ -27,6 +28,13 @@
             "description": "Shadow records and evaluates policy without changing breaker opening or recovery. Active explicitly enables the plugin thresholds.",
             "type": "string",
             "enum": ["shadow", "active"]
+          },
+          "transient_health_window_ms": {
+            "title": "Transient health window (milliseconds)",
+            "description": "Host-owned aligned evidence window. Active mode requires MTC migration 104 and the short-window runtime contract.",
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 300000
           },
           "min_samples": {
             "title": "Minimum samples before opening",
@@ -75,6 +83,7 @@
       },
       "default": {
         "transient_health_mode": "shadow",
+        "transient_health_window_ms": 60000,
         "min_samples": 2,
         "open_micros": 900000,
         "recover_micros": 600000,

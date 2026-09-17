@@ -21,6 +21,7 @@ enum TransientHealthMode {
 #[serde(deny_unknown_fields)]
 struct Configuration {
     transient_health_mode: TransientHealthMode,
+    transient_health_window_ms: u64,
     min_samples: u32,
     open_micros: u32,
     recover_micros: u32,
@@ -131,7 +132,8 @@ fn valid_identifier(value: &str) -> bool {
 }
 
 fn validate_configuration(config: &Configuration) -> Result<(), String> {
-    if !(1..=10_000).contains(&config.min_samples)
+    if !(1_000..=300_000).contains(&config.transient_health_window_ms)
+        || !(1..=10_000).contains(&config.min_samples)
         || config.open_micros > 1_000_000
         || config.recover_micros > config.open_micros
         || !(1..=64).contains(&config.min_probe_successes)
@@ -187,6 +189,7 @@ fn plan_directive(
     config: &Configuration,
     remaining_deadline_ms: u64,
 ) -> Directive {
+    let active = config.transient_health_mode == TransientHealthMode::Active;
     let core_owned_hard_state =
         matches!(candidate.health, Health::HardQuota | Health::Authentication);
     Directive {
@@ -194,21 +197,21 @@ fn plan_directive(
         route_id: candidate.route_id,
         account_id: candidate.account_id,
         generation: candidate.generation,
-        allow_transient_probe: candidate.health == Health::Transient,
-        cooldown_ms: if core_owned_hard_state {
-            0
-        } else {
+        allow_transient_probe: active && candidate.health == Health::Transient,
+        cooldown_ms: if active && !core_owned_hard_state {
             config.cooldown_ms
-        },
-        recovery_wait_ms: if core_owned_hard_state {
-            0
         } else {
+            0
+        },
+        recovery_wait_ms: if active && !core_owned_hard_state {
             config.recovery_wait_ms.min(remaining_deadline_ms)
-        },
-        recheck_ms: if core_owned_hard_state {
-            0
         } else {
+            0
+        },
+        recheck_ms: if active && !core_owned_hard_state {
             config.recheck_ms
+        } else {
+            0
         },
         stickiness: false,
         transient_policy: transient_policy(config),
@@ -216,6 +219,7 @@ fn plan_directive(
 }
 
 fn observe_directive(input: ObserveInput) -> Directive {
+    let active = input.config.transient_health_mode == TransientHealthMode::Active;
     let core_owned_hard_state =
         matches!(input.outcome, Outcome::HardQuota | Outcome::Authentication)
             || matches!(
@@ -231,10 +235,10 @@ fn observe_directive(input: ObserveInput) -> Directive {
         account_id: input.candidate.account_id,
         generation: input.candidate.generation,
         allow_transient_probe: false,
-        cooldown_ms: if core_owned_hard_state {
-            0
-        } else {
+        cooldown_ms: if active && !core_owned_hard_state {
             input.config.cooldown_ms
+        } else {
+            0
         },
         recovery_wait_ms: 0,
         recheck_ms: 0,
@@ -289,7 +293,11 @@ fn observe(input_json: &str) -> Result<String, String> {
         return Err("invalid group-routing-v2 observation".into());
     }
     validate_candidate(&input.candidate, &input.tenant_id)?;
-    let _ = (input.seed, input.remaining_deadline_ms);
+    let _ = (
+        input.seed,
+        input.remaining_deadline_ms,
+        input.config.transient_health_window_ms,
+    );
     serde_json::to_string(&observe_directive(input)).map_err(|_| "invalid routing output".into())
 }
 
@@ -316,6 +324,7 @@ mod tests {
     fn config(mode: &str) -> Value {
         json!({
             "transient_health_mode": mode,
+            "transient_health_window_ms": 60000,
             "min_samples": 2,
             "open_micros": 900000,
             "recover_micros": 600000,
@@ -366,8 +375,10 @@ mod tests {
         assert_eq!(directives[0]["route_id"], "healthy");
         assert_eq!(directives[1]["route_id"], "transient");
         assert_eq!(directives[2]["route_id"], "hard");
-        assert_eq!(directives[0]["recovery_wait_ms"], 250);
-        assert_eq!(directives[1]["allow_transient_probe"], true);
+        assert_eq!(directives[0]["cooldown_ms"], 0);
+        assert_eq!(directives[0]["recovery_wait_ms"], 0);
+        assert_eq!(directives[0]["recheck_ms"], 0);
+        assert_eq!(directives[1]["allow_transient_probe"], false);
         assert_eq!(directives[2]["allow_transient_probe"], false);
         assert_eq!(directives[2]["cooldown_ms"], 0);
         assert_eq!(directives[2]["recovery_wait_ms"], 0);
@@ -388,6 +399,9 @@ mod tests {
                 "min_probe_successes": 2
             })
         );
+        assert_eq!(output["candidates"][0]["cooldown_ms"], 5000);
+        assert_eq!(output["candidates"][0]["recovery_wait_ms"], 1000);
+        assert_eq!(output["candidates"][1]["allow_transient_probe"], true);
     }
 
     #[test]
@@ -408,6 +422,25 @@ mod tests {
     }
 
     #[test]
+    fn shadow_observation_emits_no_health_control_directives() {
+        let request = json!({
+            "tenant_id": "tenant",
+            "seed": 9,
+            "remaining_deadline_ms": 500,
+            "config": config("shadow"),
+            "candidate": candidate("transient", "transient"),
+            "outcome": "transient_failure"
+        });
+        let output: Value = serde_json::from_str(&observe(&request.to_string()).unwrap()).unwrap();
+        assert_eq!(output["allow_transient_probe"], false);
+        assert_eq!(output["cooldown_ms"], 0);
+        assert_eq!(output["recovery_wait_ms"], 0);
+        assert_eq!(output["recheck_ms"], 0);
+        assert_eq!(output["stickiness"], false);
+        assert_eq!(output["transient_policy"]["mode"], "shadow");
+    }
+
+    #[test]
     fn malformed_or_ambiguous_input_fails_closed() {
         let mut bad = plan_value("active", 1000);
         bad["config"]["recover_micros"] = json!(900001);
@@ -423,6 +456,10 @@ mod tests {
 
         bad = plan_value("active", 1000);
         bad["candidates"][0]["transient_signal"]["ewma_micros"] = json!(1000001);
+        assert!(plan(&bad.to_string()).is_err());
+
+        bad = plan_value("active", 1000);
+        bad["config"]["transient_health_window_ms"] = json!(999);
         assert!(plan(&bad.to_string()).is_err());
     }
 }

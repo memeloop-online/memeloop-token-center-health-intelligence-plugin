@@ -37,6 +37,13 @@ jobs:
           node <<'NODE'
           const { appendFileSync, readFileSync } = require('node:fs');
           const trust = JSON.parse(readFileSync('release/mtc-installer-trust.json', 'utf8'));
+          if (trust.status !== 'ready') {
+            throw new Error(`plugin publication is fail-closed: ${trust.blocking_reason}`);
+          }
+          if (!/^sha256:[0-9a-f]{64}$/.test(trust.installer_digest ?? '')
+              || !/^[0-9a-f]{40}$/.test(trust.installer_source_revision ?? '')) {
+            throw new Error('plugin publication requires a reviewed v2-compatible installer pin');
+          }
           appendFileSync(process.env.GITHUB_ENV, [
             `INSTALLER_SOURCE=${trust.installer_repository}`,
             `INSTALLER_DIGEST=${trust.installer_digest}`,
@@ -48,7 +55,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: memeloop-online/memeloop-token-center
-          ref: 76d0a5e9dd9788b486f3e053d740596d7da80a3d
+          ref: aca14f12a8522b817b8463c237ae6d6c5f04cb76
           path: mtc-core
           persist-credentials: false
       - name: Verify pinned WIT and group-routing-v2 schema support

@@ -36,37 +36,57 @@ WebAssembly component，不是 JavaScript 服务或远程页面。插件严格�
 
 ## Compatibility / 兼容性
 
-This release targets MTC source revision
-[`76d0a5e9dd9788b486f3e053d740596d7da80a3d`](https://github.com/memeloop-online/memeloop-token-center/commit/76d0a5e9dd9788b486f3e053d740596d7da80a3d),
-which introduced the durable `group-routing-v2` signal contract. The WIT package
-remains `memeloop:token-center@0.2.0`; v2 fields travel through the independent
+CI currently targets reviewed MTC pull request
+[`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326) at
+source revision `aca14f12a8522b817b8463c237ae6d6c5f04cb76`. Active mode requires
+the complete short-window runtime contract and database migration 104
+(`transient_health_signal_windows`), in addition to the original durable
+`group-routing-v2` contract from #320. The WIT package remains
+`memeloop:token-center@0.2.0`; v2 fields travel through the independent
 `group-routing-plugin` JSON ABI. The vendored
 [`wit/token-center.wit`](wit/token-center.wit) must remain byte-identical to the
 pinned host revision.
 
-本版本依赖上述 MTC core revision 提供的持久化 `group-routing-v2` 信号契约。WIT
-包版本仍为 `0.2.0`；v2 字段通过独立 `group-routing-plugin` JSON ABI 传递。本仓库不
-包含主仓库迁移工具、数据库迁移或部署配置。
+CI 当前固定到 MTC PR #326 的上述受审 revision。active 模式除 #320 的持久化
+`group-routing-v2` 契约外，还明确依赖完整 short-window runtime 和数据库 migration
+104（`transient_health_signal_windows`）。WIT 包版本仍为 `0.2.0`；本仓库不包含主仓库
+迁移工具、数据库迁移或部署配置。
+
+No compatible official installer has been published from a revision containing
+migration 104 yet. Therefore this repository is not currently publishable or
+installable: [`release/mtc-installer-trust.json`](release/mtc-installer-trust.json)
+is intentionally `blocked`. A release maintainer must wait for #326 to merge,
+publish the official installer from a post-merge revision, verify its digest and
+source revision, and update the trust file in review before publication can run.
+
+目前尚无包含 migration 104 的官方 installer 发布物，因此本仓库现在不可发布、不可
+安装；trust 文件被有意标为 `blocked`。必须等待 #326 合并并从 post-merge revision
+发布官方 installer，验证其 digest/source revision 后，再通过评审更新 trust pin。
 
 ## Release and installation / 发布与安装
 
-The manual `publish` GitHub Actions workflow builds and tests the component,
+Once a compatible installer pin is reviewed and marked `ready`, the manual
+`publish` GitHub Actions workflow builds and tests the component,
 publishes the exact `plugin.json` and `plugin.wasm` as MTC OCI media types,
 captures the registry digest, signs that digest with GitHub OIDC/Cosign, verifies
 the exact workflow identity, then reinstalls the signed digest with MTC's
 official digest-pinned installer. Publication fails closed if OIDC, package
 write access, the workflow token, the reviewed installer digest, signature
 verification, manifest validation, or byte-for-byte reinstall comparison is
-unavailable. No signing key or fallback secret is checked into this repository.
+unavailable. Its first trust-resolution step fails immediately while the trust
+file is `blocked`; it cannot push an unsigned or unverifiable candidate. No
+signing key or fallback secret is checked into this repository.
 
-手动 `publish` workflow 会构建并测试组件，以 MTC OCI media type 发布精确的
+只有受审兼容 installer pin 标为 `ready` 后，手动 `publish` workflow 才会构建并测试
+组件，以 MTC OCI media type 发布精确的
 `plugin.json` 与 `plugin.wasm`，取得 registry digest 后使用 GitHub OIDC/Cosign
 签名并校验精确 workflow identity，最后用 MTC 官方 digest-pinned installer 回装。
 OIDC、包写权限、workflow token、受审 installer digest、签名校验、manifest 校验或
-逐字节回装任一步不可用时都会失败关闭；仓库不保存签名私钥或伪造 secret。
+逐字节回装任一步不可用时都会失败关闭。trust 为 `blocked` 时第一步就立即失败，不能
+推送未签名或不可验证候选；仓库不保存签名私钥或伪造 secret。
 
-Use only the digest reference recorded in a successful workflow's
-`plugin-release.json` evidence:
+After trust is unlocked and a workflow succeeds, use only the digest reference
+recorded in its `plugin-release.json` evidence:
 
 ```text
 ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest>
@@ -78,45 +98,33 @@ The trusted keyless identity is:
 https://github.com/memeloop-online/memeloop-token-center-health-intelligence-plugin/.github/workflows/publish.yml@refs/heads/master
 ```
 
-For an operator-managed filesystem inventory, invoke the reviewed installer
-image from [`release/mtc-installer-trust.json`](release/mtc-installer-trust.json)
-and keep both installer and plugin references digest-pinned:
+The release evidence also records the exact official installer digest used for
+reinstallation. Do not substitute the older `c8b68028…` installer revision: it
+predates group-routing-v2 and cannot validate this package. Registry credentials,
+when required, must come from operator-managed mounted files; never put them in
+an OCI reference, manifest, strategy configuration, shell history, or repository.
 
-```bash
-docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --tmpfs /tmp:rw,nosuid,nodev,size=32m \
-  --mount type=bind,src=/absolute/operator/plugin-root,dst=/plugins \
-  --entrypoint /usr/local/bin/install-plugin-oci \
-  ghcr.io/memeloop-online/memeloop-token-center-plugin-installer@sha256:3762012f35acf9151b4aa49a52565be882d016da64d6b368bf901adb8985121e \
-  ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest> \
-  --plugin-dir /plugins \
-  --allowed-source ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin \
-  --cosign-certificate-identity https://github.com/memeloop-online/memeloop-token-center-health-intelligence-plugin/.github/workflows/publish.yml@refs/heads/master \
-  --cosign-certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-If registry authentication is required, mount operator-managed username and
-token files and use the installer's `--registry-username-file` and
-`--registry-password-file` flags. Never put credentials in the OCI reference,
-manifest, strategy configuration, shell history, or repository.
-
-如 registry 需要认证，请挂载由运维管理的用户名/token 文件，并使用 installer 的
-`--registry-username-file` 与 `--registry-password-file`；不要把凭证写入 OCI 引用、
-manifest、策略配置、shell history 或仓库。
+release evidence 还会记录回装所用的精确官方 installer digest。不得替换为较旧的
+`c8b68028…` installer revision；它早于 group-routing-v2，无法验证本包。registry
+凭证必须来自运维管理的挂载文件，不能写入 OCI 引用、manifest、策略配置、shell
+history 或仓库。
 
 ## Bind to a group / 绑定到组
 
-Installation makes the strategy available but does not activate it. In the MTC
+After a compatible signed release exists, installation makes the strategy
+available but does not activate it. In the MTC
 operator UI, open a Provider Group or Route Group, select
 `mtc-transient-health`, review the generated configuration form, leave
 `transient_health_mode` as `shadow` for initial observation, set routing
 priority, and save with the current group/strategy versions. Binding never
-changes group membership or authorization.
+changes group membership or authorization. Do not bind this plugin to an MTC
+revision older than the post-#326 short-window contract.
 
-安装只让策略可选，不会自动启用。请在 MTC 运维界面的 Provider Group 或 Route Group
+兼容签名发布物产生后，安装只让策略可选，不会自动启用。请在 MTC 运维界面的
+Provider Group 或 Route Group
 中选择 `mtc-transient-health`，审核自动生成的配置表单，首次绑定保持
 `transient_health_mode: shadow`，设置 routing priority，并使用当前 group/strategy
-版本保存。绑定不会改变组成员或授权。
+版本保存。绑定不会改变组成员或授权；不要绑定到早于 #326 short-window 契约的 MTC。
 
 The equivalent API is `PUT` on either
 `/internal/v1/provider-groups/{group_id}/routing-strategy` or
@@ -133,6 +141,7 @@ substitute its real concurrency values; do not copy the placeholders below:
     "plugin_id": "mtc-transient-health",
     "config": {
       "transient_health_mode": "shadow",
+      "transient_health_window_ms": 60000,
       "min_samples": 2,
       "open_micros": 900000,
       "recover_micros": 600000,
@@ -157,6 +166,7 @@ an explicit retry.
 | Field / 字段 | Default / 默认 | Meaning / 含义 |
 | --- | ---: | --- |
 | `transient_health_mode` | `shadow` | `shadow` keeps core behavior while evaluating signals; only explicit `active` enables threshold control. / shadow 只观测；显式 active 才启用阈值控制。 |
+| `transient_health_window_ms` | `60000` | Host-owned aligned evidence window, 1000–300000 ms. Requires migration 104. / 宿主拥有的对齐证据窗口，范围 1000–300000 ms，依赖 migration 104。 |
 | `min_samples` | `2` | Minimum conclusive samples before the EWMA may open the breaker. / EWMA 可触发熔断前的最少确定样本。 |
 | `open_micros` | `900000` | Open when failure EWMA reaches 0.90 after `min_samples`. / 满足样本数且失败 EWMA 达 0.90 时打开。 |
 | `recover_micros` | `600000` | Recovery requires EWMA at or below 0.60. Must not exceed `open_micros`. / 恢复要求 EWMA ≤ 0.60，且不得高于打开阈值。 |
@@ -171,10 +181,20 @@ outcomes are not transient samples. In active mode the host—not the guest—op
 the breaker only after the configured sample/threshold condition, and keeps a
 half-open account fenced until both recovery conditions pass.
 
+In shadow mode the guest emits zero cooldown, zero recovery wait, zero recheck,
+and no probe admission as defense in depth. The compatible post-#326 host also
+ignores all shadow health directives and only records bounded window evidence.
+This guarantee does not apply to older hosts, which are unsupported for this
+package.
+
 MTC 把确定成功记为 `0`、瞬态失败记为 `1,000,000`，使用 alpha=`1/4` 的整数
 EWMA。硬额度、认证失败和取消不属于瞬态样本。active 模式下仍由宿主而不是 guest
 执行熔断；只有满足样本/阈值条件才打开，并在两个恢复条件都通过前保持 half-open
 隔离。
+
+shadow 模式下 guest 会防御性地输出零 cooldown、零 recovery wait、零 recheck 且不
+准入 probe；兼容的 post-#326 宿主还会完全忽略 shadow 健康指令，只记录有界窗口
+证据。旧宿主不具备该保证，本包不支持旧宿主。
 
 ## Repository layout / 仓库结构
 
@@ -185,8 +205,8 @@ EWMA。硬额度、认证失败和取消不属于瞬态样本。active 模式下
   Wasm component validation.
 - `.github/workflows/publish.yml`: digest publication, keyless signing, official
   installer reinstall, manifest/receipt verification, and release evidence.
-- `release/mtc-installer-trust.json`: reviewed official installer digest and
-  compatible core revision.
+- `release/mtc-installer-trust.json`: fail-closed release state, compatible core
+  revision, and—only after review—the official installer digest.
 
 This repository intentionally contains no service deployment, internal domain,
 production identity, live operations data, database migration, or main-repository
