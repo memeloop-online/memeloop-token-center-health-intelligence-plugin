@@ -52,6 +52,8 @@ if (trust.status === 'blocked') {
   assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
   assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
   assert.notEqual(trust.installer_source_revision, 'c8b68028a21e80a610b74ee3c41b442a69b84f97');
+  assert.equal(trust.core_revision, trust.installer_source_revision);
+  assert(!Object.hasOwn(trust, 'blocking_reason'));
 }
 assert.equal(trust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
 assert.equal(trust.cosign_version, 'v3.1.3-mtc.3');

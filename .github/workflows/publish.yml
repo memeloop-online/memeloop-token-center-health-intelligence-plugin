@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: memeloop-online/memeloop-token-center
-          ref: b9ba6603d23c61d943c83b619acb2c7883a19776
+          ref: 48465eaf751ef479122ac262806a22ada15c37eb
           path: mtc-core
           persist-credentials: false
       - name: Verify pinned WIT and group-routing-v2 schema support
