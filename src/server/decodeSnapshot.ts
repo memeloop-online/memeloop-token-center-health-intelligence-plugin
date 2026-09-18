@@ -107,9 +107,10 @@ function source(value: unknown, id: SourceId): SourceSnapshot | null {
 
 export function decodeSnapshot(value: unknown): HealthIntelligenceSnapshot {
   const root = record(value);
+  const rawSources = root?.sources;
   if (!root || root.schemaVersion !== 1 || !date(root.generatedAt)
-    || !Array.isArray(root.sources) || root.sources.length !== SOURCE_IDS.length) throw new SnapshotDecodeError();
-  const sources = SOURCE_IDS.map((id, index) => source(root.sources[index], id));
+    || !Array.isArray(rawSources) || rawSources.length !== SOURCE_IDS.length) throw new SnapshotDecodeError();
+  const sources = SOURCE_IDS.map((id, index) => source(rawSources[index], id));
   if (sources.some((entry) => entry === null)) throw new SnapshotDecodeError();
   return {
     schemaVersion: 1,

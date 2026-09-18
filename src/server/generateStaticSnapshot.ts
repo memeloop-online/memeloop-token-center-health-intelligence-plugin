@@ -13,7 +13,8 @@ async function previousSnapshot() {
   }
 }
 
-const snapshot = await new SnapshotService({ initialSnapshot: await previousSnapshot() }).read(true);
+const previous = await previousSnapshot();
+const snapshot = await new SnapshotService(previous ? { initialSnapshot: previous } : {}).read(true);
 
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`, { encoding: 'utf8', mode: 0o644 });
