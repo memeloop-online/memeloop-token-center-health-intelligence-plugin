@@ -24,57 +24,63 @@
         ],
         "properties": {
           "transient_health_mode": {
-            "title": "Transient health mode",
-            "description": "Shadow records and evaluates policy without changing breaker opening or recovery. Active explicitly enables the plugin thresholds.",
+            "title": "Mode",
+            "description": "Shadow records health evidence. Active applies the configured thresholds through MTC core.",
             "type": "string",
             "enum": ["shadow", "active"]
           },
           "transient_health_window_ms": {
-            "title": "Transient health window (milliseconds)",
-            "description": "Host-owned aligned evidence window. Active mode requires MTC migration 104 and the short-window runtime contract.",
+            "title": "Evidence window (ms)",
+            "description": "Aligned health-evidence window managed by MTC core. Active mode uses migration 104 and the short-window runtime.",
             "type": "integer",
             "minimum": 1000,
             "maximum": 300000
           },
           "min_samples": {
-            "title": "Minimum samples before opening",
+            "title": "Samples before opening",
+            "description": "Conclusive samples required before the opening threshold can apply.",
             "type": "integer",
             "minimum": 1,
             "maximum": 10000
           },
           "open_micros": {
-            "title": "Open EWMA threshold (millionths)",
+            "title": "Opening threshold (EWMA ppm)",
+            "description": "Opens transient health at or above this failure EWMA after min_samples.",
             "type": "integer",
             "minimum": 0,
             "maximum": 1000000
           },
           "recover_micros": {
-            "title": "Recovery EWMA threshold (millionths)",
-            "description": "Must be less than or equal to open_micros; the component enforces the relationship.",
+            "title": "Recovery threshold (EWMA ppm)",
+            "description": "Restores transient health at or below this failure EWMA. Set it at or below open_micros.",
             "type": "integer",
             "minimum": 0,
             "maximum": 1000000
           },
           "min_probe_successes": {
-            "title": "Consecutive probe successes before recovery",
+            "title": "Probe successes before recovery",
+            "description": "Consecutive successful probes required before recovery.",
             "type": "integer",
             "minimum": 1,
             "maximum": 64
           },
           "cooldown_ms": {
-            "title": "Transient cooldown (milliseconds)",
+            "title": "Cooldown (ms)",
+            "description": "Delay between transient attempts or probes.",
             "type": "integer",
             "minimum": 0,
             "maximum": 60000
           },
           "recovery_wait_ms": {
-            "title": "Maximum in-request recovery wait (milliseconds)",
+            "title": "In-request recovery wait (ms)",
+            "description": "Maximum recovery wait within the original request deadline.",
             "type": "integer",
             "minimum": 0,
             "maximum": 300000
           },
           "recheck_ms": {
-            "title": "Recovery recheck interval (milliseconds)",
+            "title": "Recovery check interval (ms)",
+            "description": "Delay between recovery checks.",
             "type": "integer",
             "minimum": 25,
             "maximum": 5000
