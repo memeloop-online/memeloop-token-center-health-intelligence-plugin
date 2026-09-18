@@ -1,181 +1,103 @@
-# MTC Transient Health
+# MTC 健康和智商
 
-`mtc-transient-health` is the official transient-health routing policy for
-MemeLoop Token Center (`MTC`) `group-routing-v2`. It ships as a Rust WebAssembly
-component and preserves the authorized candidate order supplied by MTC.
+`mtc-health-intelligence` 是 MemeLoop Token Center 的官方 TypeScript 插件示例。安装后，它在 Operator 的“监控”分类注册“健康和智商”页签，将三个公开来源汇总为一个类型化数据视图：
 
-The policy gives MTC bounded settings for transient-failure opening, probes,
-cooldown, and recovery. MTC core stores health evidence, manages credential
-generations and probe leases, and validates every directive before routing.
+- [Codex Radar](https://codexradar.com/)：综合 IQ 与样本量。
+- [DeepSWE](https://deepswe.datacurve.ai/)：软件工程任务通过率与 Agent 步数。
+- [CDK 模型健康](https://cdk.aixhan.com/model-health)：模型服务状态、响应延迟与最近检查时间。
 
-## Install
+浏览器通过 MTC 的插件数据端点读取规范化 JSON。`typed_data_v1` 与 `health_intelligence_v1` 由 MTC 核心渲染，自动沿用 Operator 的布局、状态、排版、主题和响应式设计。插件安装后由运行时清单注册页签，无需重新构建 MTC Web。
 
-The signed OCI package is published from the manual
-[`publish`](.github/workflows/publish.yml) workflow. Use the digest reference
-recorded in its `plugin-release.json` artifact:
+## 数据流
+
+```text
+公开 JSON 来源
+  -> 固定 HTTPS 来源与路径校验
+  -> 超时、重试、响应体上限、缓存
+  -> TypeScript 规范化与字段裁剪
+  -> /api/health-intelligence 类型化快照
+  -> MTC service_data 代理
+  -> Operator“健康和智商”页签
+```
+
+根目录的 [`plugin.json`](plugin.json) 使用当前 MTC 清单契约：
+
+- 插件 ID：`mtc-health-intelligence`
+- 数据贡献：`contributions.service_data[0]`
+- Operator 贡献：`contributions.operator_ui[0]`
+- 分类：`monitoring`
+- 路由：`health-intelligence`
+- 渲染器：`typed_data_v1`
+- 呈现：`health_intelligence_v1`
+- 权限：`metrics:read`
+
+清单中的服务地址为：
+
+```text
+https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json
+```
+
+GitHub Pages 工作流每十分钟生成一次快照。单个来源短暂失败时沿用上一版规范化记录并标记为 `stale`，其余来源继续更新；首次采集失败的来源标记为 `error`。
+
+仓库管理员首次发布前在 Pages 设置中选择 **GitHub Actions** 作为发布源。合并到 `master` 后，`publish health intelligence API` 工作流会更新上述地址。
+
+## 安装
+
+手动 `publish plugin` 工作流发布 manifest-only 的签名 OCI 插件包：
 
 ```text
 ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest>
 ```
 
-Install that reference with the MTC plugin installer. The same release artifact
-records the installer digest and signature identity used for verification.
+发布前工作流会验证 Pages API、当前 MTC 清单契约和固定安装器信任；发布后使用官方 `install-plugin-oci` 对签名字节执行干净重装。安装并刷新插件清单后，“健康和智商”会出现在 Operator 的“监控”分类。
 
-## Enable the policy
+## API 契约
 
-1. Open a **Provider Group** or **Route Group** in the MTC operator UI.
-2. Select `mtc-transient-health` as the routing strategy.
-3. Keep `transient_health_mode` set to `shadow` during the first observation
-   period.
-4. Review the evidence, set the routing priority, and save the group.
-5. Change `transient_health_mode` to `active` when the group is ready to apply
-   the configured thresholds.
-
-`shadow` is the default. It records bounded evidence while MTC keeps its current
-health behavior. `active` applies the configured thresholds through MTC core.
-
-The equivalent API is `PUT` on either:
-
-- `/internal/v1/provider-groups/{group_id}/routing-strategy`
-- `/internal/v1/route-groups/{group_id}/routing-strategy`
-
-Read the group first and use its current concurrency values:
+响应结构由 [`schemas-health-intelligence.json`](schemas-health-intelligence.json) 定义：
 
 ```json
 {
-  "tenant_external_id": "TENANT_EXTERNAL_ID",
-  "expected_updated_at": 0,
-  "expected_strategy_version": 0,
-  "routing_priority": 10,
-  "routing_strategy": {
-    "plugin_id": "mtc-transient-health",
-    "config": {
-      "transient_health_mode": "shadow",
-      "transient_health_window_ms": 60000,
-      "min_samples": 2,
-      "open_micros": 900000,
-      "recover_micros": 600000,
-      "min_probe_successes": 2,
-      "cooldown_ms": 5000,
-      "recovery_wait_ms": 1000,
-      "recheck_ms": 100
-    }
-  }
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-18T11:00:00.000Z",
+  "sources": [
+    { "id": "codexradar", "status": "ok", "rows": [] },
+    { "id": "deepswe", "status": "ok", "rows": [] },
+    { "id": "aixhan", "status": "ok", "rows": [] }
+  ]
 }
 ```
 
-## Policy settings
+每个来源包含固定的 `pageUrl` 与 `endpoint`、采集时间、来源更新时间、状态、尝试次数和最多 24 条规范化记录。原始响应、HTML、Cookie、授权头与来源凭据均不进入快照。
 
-| Setting | Default | Purpose |
-| --- | ---: | --- |
-| `transient_health_mode` | `shadow` | `shadow` records evidence; `active` applies the thresholds. |
-| `transient_health_window_ms` | `60000` | Aligned evidence window managed by MTC, from 1 to 300 seconds. |
-| `min_samples` | `2` | Conclusive samples required before opening. |
-| `open_micros` | `900000` | Opens at a failure EWMA of 0.90 after the sample requirement is met. |
-| `recover_micros` | `600000` | Recovery threshold of 0.60; this value stays at or below `open_micros`. |
-| `min_probe_successes` | `2` | Consecutive successful probes required for recovery. |
-| `cooldown_ms` | `5000` | Delay between transient attempts or probes. |
-| `recovery_wait_ms` | `1000` | Maximum recovery wait within the original request deadline. |
-| `recheck_ms` | `100` | Interval between recovery checks. |
-
-MTC records a conclusive success as `0` and a transient failure as `1,000,000`,
-using an integer EWMA with alpha `1/4`. Quota, authentication, and cancellation
-outcomes follow their dedicated MTC health paths. In active mode, MTC opens the
-breaker after the sample and threshold conditions are met and restores a
-half-open account after both recovery conditions pass.
-
-## Roll back
-
-Set `routing_strategy` to `null` with the group's current concurrency values.
-The group immediately returns to native routing. A `409` response indicates a
-newer group version; read the group again and submit the updated version.
-
-## Development
-
-Compatibility is pinned to the MTC contract merged in
-[`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326) at
-revision `48465eaf751ef479122ac262806a22ada15c37eb`. Active mode uses migration
-104 (`transient_health_signal_windows`) and the short-window runtime. The
-vendored [`wit/token-center.wit`](wit/token-center.wit) matches that host
-revision, while the v2 fields use the `group-routing-plugin` JSON ABI.
-
-CI builds and validates the component. The publish workflow signs the OCI
-digest with GitHub OIDC/Cosign and verifies a clean reinstall with the official
-MTC installer. Installer compatibility is recorded in
-[`release/mtc-installer-trust.json`](release/mtc-installer-trust.json).
-
----
-
-## 中文
-
-`mtc-transient-health` 是 MemeLoop Token Center（`MTC`）官方提供的
-`group-routing-v2` 瞬态健康路由策略。它以 Rust WebAssembly 组件交付，并完整保留
-MTC 提供的已授权候选顺序。
-
-该策略向 MTC 提供瞬态失败熔断、探针、冷却和恢复参数。健康证据、凭证代际、探针租约
-和指令校验均由 MTC 核心管理。
-
-### 安装
-
-签名 OCI 包由手动 [`publish`](.github/workflows/publish.yml) 工作流发布。安装时使用
-`plugin-release.json` 制品中记录的 digest 引用：
+服务也可以作为常驻 Node 进程运行：
 
 ```text
-ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest>
+npm ci --ignore-scripts
+npm run build
+PORT=8080 npm run serve
 ```
 
-通过 MTC 插件安装器安装该引用。发布制品同时记录验证所用的安装器 digest 和签名身份。
+常驻服务提供 `GET /api/health-intelligence`。同一 `SnapshotService` 同时用于常驻服务与 Pages 快照，因此两种部署方式共享来源约束和类型化输出。
 
-### 启用策略
+## 边界
 
-1. 在 MTC 运维界面打开 **Provider Group** 或 **Route Group**。
-2. 选择 `mtc-transient-health` 路由策略。
-3. 首个观测周期保持 `transient_health_mode: shadow`。
-4. 查看观测证据，设置路由优先级并保存。
-5. 准备应用阈值时，将 `transient_health_mode` 改为 `active`。
+来源列表位于 [`src/server/sources.ts`](src/server/sources.ts)，请求前由 [`src/server/security.ts`](src/server/security.ts) 校验：
 
-默认模式为 `shadow`，用于记录有界证据并保持当前健康行为。`active` 通过 MTC 核心应用
-配置中的阈值。
+- 仅允许三个已审查的 HTTPS origin 与固定路径。
+- 禁用重定向，省略浏览器凭据，并发送固定 User-Agent。
+- 单次请求超时 4 秒，瞬态失败最多重试两次。
+- JSON 响应上限为 2 MiB，`robots.txt` 上限为 64 KiB。
+- 内存缓存有效期为 5 分钟；刷新失败时可返回上一次规范化数据并标记为 `stale`。
+- 错误信息只保留有限分类，不回传上游响应正文。
 
-API 配置使用以下任一 `PUT` 端点：
+## 开发与验证
 
-- `/internal/v1/provider-groups/{group_id}/routing-strategy`
-- `/internal/v1/route-groups/{group_id}/routing-strategy`
+CI 使用 Node 24，执行：
 
-提交前先读取组，并使用当前并发版本。请求体结构参见上方示例。
+```text
+npm ci --ignore-scripts
+npm run check
+node scripts/verify-static.mjs <pinned-mtc-source>
+```
 
-### 策略参数
-
-| 参数 | 默认值 | 用途 |
-| --- | ---: | --- |
-| `transient_health_mode` | `shadow` | `shadow` 记录证据；`active` 应用阈值。 |
-| `transient_health_window_ms` | `60000` | MTC 管理的对齐证据窗口，范围为 1 至 300 秒。 |
-| `min_samples` | `2` | 触发熔断前要求的确定样本数。 |
-| `open_micros` | `900000` | 满足样本要求后，失败 EWMA 达到 0.90 时打开熔断。 |
-| `recover_micros` | `600000` | 恢复阈值为 0.60，取值需小于或等于 `open_micros`。 |
-| `min_probe_successes` | `2` | 恢复前要求的连续成功探针数。 |
-| `cooldown_ms` | `5000` | 瞬态尝试或探针之间的等待时间。 |
-| `recovery_wait_ms` | `1000` | 原请求截止时间内的最大恢复等待。 |
-| `recheck_ms` | `100` | 两次恢复检查之间的间隔。 |
-
-MTC 将确定成功记为 `0`，将瞬态失败记为 `1,000,000`，并使用 alpha=`1/4` 的整数
-EWMA。额度、认证和取消结果进入各自的 MTC 健康处理路径。启用模式下，样本与阈值条件
-满足后打开熔断；两项恢复条件均满足后恢复 half-open 账号。
-
-### 回滚
-
-携带组的当前并发版本，将 `routing_strategy` 设为 `null`。组会立即恢复原生路由。
-收到 `409` 时，重新读取组并提交最新版本。
-
-### 开发说明
-
-兼容契约固定到 MTC
-[`#326`](https://github.com/memeloop-online/memeloop-token-center/pull/326) 合并版本
-`48465eaf751ef479122ac262806a22ada15c37eb`。启用模式使用 migration 104
-（`transient_health_signal_windows`）和短窗口运行时。仓库中的
-[`wit/token-center.wit`](wit/token-center.wit) 与该宿主版本一致，v2 字段通过
-`group-routing-plugin` JSON ABI 传递。
-
-CI 负责构建和验证组件。发布工作流使用 GitHub OIDC/Cosign 签名 OCI digest，并通过
-MTC 官方安装器验证安装结果。安装器兼容状态记录在
-[`release/mtc-installer-trust.json`](release/mtc-installer-trust.json)。
+单元测试只读取 `test/fixtures`。清单校验固定到 MTC `d5598638654fab18b91ae2067b7d5ae11e81ae29`，覆盖当前 `service_data`、运行时 Operator 页签注册、`typed_data_v1` 和 `health_intelligence_v1` 契约。真实来源采集仅在 Pages 发布工作流执行。

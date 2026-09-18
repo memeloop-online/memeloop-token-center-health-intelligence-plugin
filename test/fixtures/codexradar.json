@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "generated_at": "2026-09-07T07:41:03+00:00",
+  "source_updated_at": "2026-09-07T06:58:38+00:00",
+  "comprehensive_points": [
+    {
+      "model": "gpt-6-astra",
+      "effort": "medium",
+      "iq": 111.0,
+      "software_iq": 106.19,
+      "visual_iq": 141.19,
+      "samples": 131
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "effort": "max",
+      "iq": 105.76,
+      "software_iq": 106.7,
+      "visual_iq": 102.11,
+      "samples": 422
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "iq": 19.37,
+      "software_iq": 8.04,
+      "visual_iq": 63.67,
+      "samples": 422
+    }
+  ]
+}

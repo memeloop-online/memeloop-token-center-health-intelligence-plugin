@@ -1,103 +1,187 @@
 {
-  "id": "mtc-transient-health",
+  "id": "mtc-health-intelligence",
   "version": "1.0.0",
   "wit_version": "0.2.0",
-  "wasm": "plugin.wasm",
-  "capabilities": [],
-  "contributions": {
-    "group_routing": {
-      "version": "group-routing-v2",
-      "health_policy": "plugin",
-      "schema": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "transient_health_mode",
-          "transient_health_window_ms",
-          "min_samples",
-          "open_micros",
-          "recover_micros",
-          "min_probe_successes",
-          "cooldown_ms",
-          "recovery_wait_ms",
-          "recheck_ms"
-        ],
-        "properties": {
-          "transient_health_mode": {
-            "title": "Mode",
-            "description": "Shadow records health evidence. Active applies the configured thresholds through MTC core.",
-            "type": "string",
-            "enum": ["shadow", "active"]
-          },
-          "transient_health_window_ms": {
-            "title": "Evidence window (ms)",
-            "description": "Aligned health-evidence window managed by MTC core. Active mode uses migration 104 and the short-window runtime.",
-            "type": "integer",
-            "minimum": 1000,
-            "maximum": 300000
-          },
-          "min_samples": {
-            "title": "Samples before opening",
-            "description": "Conclusive samples required before the opening threshold can apply.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10000
-          },
-          "open_micros": {
-            "title": "Opening threshold (EWMA ppm)",
-            "description": "Opens transient health at or above this failure EWMA after min_samples.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1000000
-          },
-          "recover_micros": {
-            "title": "Recovery threshold (EWMA ppm)",
-            "description": "Restores transient health at or below this failure EWMA. Set it at or below open_micros.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1000000
-          },
-          "min_probe_successes": {
-            "title": "Probe successes before recovery",
-            "description": "Consecutive successful probes required before recovery.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 64
-          },
-          "cooldown_ms": {
-            "title": "Cooldown (ms)",
-            "description": "Delay between transient attempts or probes.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 60000
-          },
-          "recovery_wait_ms": {
-            "title": "In-request recovery wait (ms)",
-            "description": "Maximum recovery wait within the original request deadline.",
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 300000
-          },
-          "recheck_ms": {
-            "title": "Recovery check interval (ms)",
-            "description": "Delay between recovery checks.",
-            "type": "integer",
-            "minimum": 25,
-            "maximum": 5000
-          }
-        }
-      },
-      "default": {
-        "transient_health_mode": "shadow",
-        "transient_health_window_ms": 60000,
-        "min_samples": 2,
-        "open_micros": 900000,
-        "recover_micros": 600000,
-        "min_probe_successes": 2,
-        "cooldown_ms": 5000,
-        "recovery_wait_ms": 1000,
-        "recheck_ms": 100
-      }
+  "wasm": null,
+  "capabilities": [
+    {
+      "kind": "http",
+      "allowed_origins": [
+        "https://memeloop-online.github.io"
+      ]
     }
+  ],
+  "contributions": {
+    "traffic_policy": false,
+    "request_rewrite": false,
+    "configuration": null,
+    "providers": [],
+    "service_data": [
+      {
+        "id": "health-intelligence",
+        "url": "https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json",
+        "required_scope": "metrics:read",
+        "response_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://memeloop.dev/plugins/mtc-health-intelligence/v1/snapshot.schema.json",
+          "title": "Health and intelligence snapshot",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schemaVersion", "generatedAt", "sources"],
+          "properties": {
+            "schemaVersion": { "const": 1 },
+            "generatedAt": { "type": "string", "format": "date-time" },
+            "sources": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "$ref": "#/$defs/source" }
+            }
+          },
+          "$defs": {
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "label", "pageUrl", "endpoint", "status", "fetchedAt", "sourceUpdatedAt", "ageSeconds", "attempts", "error", "rows"],
+              "properties": {
+                "id": { "enum": ["codexradar", "deepswe", "aixhan"] },
+                "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+                "pageUrl": { "type": "string", "format": "uri" },
+                "endpoint": { "type": "string", "format": "uri" },
+                "status": { "enum": ["ok", "stale", "error"] },
+                "fetchedAt": { "type": "string", "format": "date-time" },
+                "sourceUpdatedAt": { "type": ["string", "null"], "format": "date-time" },
+                "ageSeconds": { "type": ["number", "null"], "minimum": 0 },
+                "attempts": { "type": "integer", "minimum": 0, "maximum": 12 },
+                "error": { "type": ["string", "null"], "maxLength": 256 },
+                "rows": {
+                  "type": "array",
+                  "maxItems": 24,
+                  "items": {
+                    "oneOf": [
+                      { "$ref": "#/$defs/codexRadarRow" },
+                      { "$ref": "#/$defs/deepSweRow" },
+                      { "$ref": "#/$defs/aixHanRow" }
+                    ]
+                  }
+                }
+              },
+              "allOf": [
+                { "if": { "properties": { "id": { "const": "codexradar" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/codexRadarRow" } } } } },
+                { "if": { "properties": { "id": { "const": "deepswe" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/deepSweRow" } } } } },
+                { "if": { "properties": { "id": { "const": "aixhan" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/aixHanRow" } } } } }
+              ]
+            },
+            "codexRadarRow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "model", "effort", "iq", "softwareIq", "visualIq", "samples"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+                "model": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "effort": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "iq": { "type": "number", "minimum": 0, "maximum": 200 },
+                "softwareIq": { "type": ["number", "null"] },
+                "visualIq": { "type": ["number", "null"] },
+                "samples": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+              }
+            },
+            "deepSweRow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "model", "effort", "passRate", "passAt4", "averageCostUsd", "outputTokens", "agentSteps", "samples"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+                "model": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "effort": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "passRate": { "type": "number", "minimum": 0, "maximum": 1 },
+                "passAt4": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                "averageCostUsd": { "type": ["number", "null"], "minimum": 0, "maximum": 1000000 },
+                "outputTokens": { "type": ["number", "null"], "minimum": 0 },
+                "agentSteps": { "type": ["number", "null"], "minimum": 0 },
+                "samples": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+              }
+            },
+            "aixHanRow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "name", "model", "providerType", "status", "latencyMs", "pingLatencyMs", "checkedAt", "message"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+                "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "model": { "type": ["string", "null"], "maxLength": 160 },
+                "providerType": { "type": ["string", "null"], "maxLength": 160 },
+                "status": { "enum": ["operational", "degraded", "error", "unknown"] },
+                "latencyMs": { "type": ["number", "null"], "minimum": 0, "maximum": 86400000 },
+                "pingLatencyMs": { "type": ["number", "null"], "minimum": 0, "maximum": 86400000 },
+                "checkedAt": { "type": ["string", "null"], "format": "date-time" },
+                "message": { "type": ["string", "null"], "maxLength": 160 }
+              }
+            }
+          }
+        },
+        "fallback": {
+          "schemaVersion": 1,
+          "generatedAt": "1970-01-01T00:00:00.000Z",
+          "sources": [
+            {
+              "id": "codexradar",
+              "label": "Codex Radar 智商",
+              "pageUrl": "https://codexradar.com/",
+              "endpoint": "https://codexradar.com/api/radar-insights",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            },
+            {
+              "id": "deepswe",
+              "label": "DeepSWE 工程能力",
+              "pageUrl": "https://deepswe.datacurve.ai/",
+              "endpoint": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            },
+            {
+              "id": "aixhan",
+              "label": "CDK 模型健康",
+              "pageUrl": "https://cdk.aixhan.com/model-health",
+              "endpoint": "https://cdk.aixhan.com/api/public/check-cx/dashboard",
+              "status": "error",
+              "fetchedAt": "1970-01-01T00:00:00.000Z",
+              "sourceUpdatedAt": null,
+              "ageSeconds": null,
+              "attempts": 0,
+              "error": "service unavailable",
+              "rows": []
+            }
+          ]
+        },
+        "cache_ttl_seconds": 300,
+        "timeout_millis": 4000,
+        "max_body_bytes": 1048576
+      }
+    ],
+    "operator_ui": [
+      {
+        "id": "health-and-intelligence",
+        "slot": "operator.sidebar.tab",
+        "category": { "id": "monitoring" },
+        "route": "health-intelligence",
+        "label": "健康和智商",
+        "icon": "heart",
+        "renderer": "typed_data_v1",
+        "presentation": "health_intelligence_v1",
+        "data_endpoint": "health-intelligence"
+      }
+    ]
   }
 }

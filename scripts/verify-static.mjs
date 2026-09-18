@@ -1,92 +1,88 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const json = (path) => JSON.parse(readFileSync(join(root, path), 'utf8'));
+const read = (path) => readFileSync(join(root, path), 'utf8');
+const json = (path) => JSON.parse(read(path));
 const manifest = json('plugin.json');
-const trust = json('release/mtc-installer-trust.json');
-const contribution = manifest.contributions?.group_routing;
+const reviewedSchema = json('schemas-health-intelligence.json');
+const installerTrust = json('release/installer-trust.json');
 
-assert.equal(manifest.id, 'mtc-transient-health');
+assert.equal(manifest.id, 'mtc-health-intelligence');
 assert.equal(manifest.version, '1.0.0');
 assert.equal(manifest.wit_version, '0.2.0');
-assert.equal(manifest.wasm, 'plugin.wasm');
-assert.deepEqual(manifest.capabilities, []);
-assert.deepEqual(Object.keys(manifest.contributions), ['group_routing']);
-assert.equal(contribution.version, 'group-routing-v2');
-assert.equal(contribution.health_policy, 'plugin');
-assert.equal(contribution.schema.type, 'object');
-assert.equal(contribution.schema.additionalProperties, false);
+assert.equal(manifest.wasm, null);
+assert.deepEqual(manifest.capabilities, [{
+  kind: 'http',
+  allowed_origins: ['https://memeloop-online.github.io'],
+}]);
+assert.equal(manifest.contributions.traffic_policy, false);
+assert.equal(manifest.contributions.request_rewrite, false);
+assert.equal(manifest.contributions.configuration, null);
+assert.deepEqual(manifest.contributions.providers, []);
+assert.equal(manifest.contributions.service_data.length, 1);
+assert.equal(manifest.contributions.operator_ui.length, 1);
 
-const required = [
-  'transient_health_mode', 'transient_health_window_ms', 'min_samples',
-  'open_micros', 'recover_micros', 'min_probe_successes', 'cooldown_ms',
-  'recovery_wait_ms', 'recheck_ms',
-];
-assert.deepEqual(contribution.schema.required, required);
-assert.deepEqual(Object.keys(contribution.default), required);
-assert.equal(contribution.default.transient_health_mode, 'shadow');
-assert.equal(contribution.default.transient_health_window_ms, 60_000);
-assert(contribution.default.recover_micros <= contribution.default.open_micros);
-for (const field of required) {
-  const schema = contribution.schema.properties[field];
-  assert(schema, `missing schema for ${field}`);
-  const value = contribution.default[field];
-  if (schema.enum) assert(schema.enum.includes(value), `${field} default is outside enum`);
-  if (schema.minimum !== undefined) assert(value >= schema.minimum, `${field} default below minimum`);
-  if (schema.maximum !== undefined) assert(value <= schema.maximum, `${field} default above maximum`);
-}
+const endpoint = manifest.contributions.service_data[0];
+assert.equal(endpoint.id, 'health-intelligence');
+assert.equal(endpoint.url, 'https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json');
+assert.equal(endpoint.required_scope, 'metrics:read');
+assert.deepEqual(endpoint.response_schema, reviewedSchema);
+assert.equal(endpoint.cache_ttl_seconds, 300);
+assert.equal(endpoint.timeout_millis, 4000);
+assert.equal(endpoint.max_body_bytes, 1_048_576);
+assert.equal(endpoint.fallback.schemaVersion, 1);
+assert.deepEqual(endpoint.fallback.sources.map((source) => source.id), ['codexradar', 'deepswe', 'aixhan']);
+assert(endpoint.fallback.sources.every((source) => source.status === 'error' && source.rows.length === 0));
 
-assert.equal(trust.format_version, 1);
-assert(['blocked', 'ready'].includes(trust.status));
-assert.equal(trust.required_migration, 104);
-assert.match(trust.core_revision, /^[0-9a-f]{40}$/);
-if (trust.status === 'blocked') {
-  assert.equal(typeof trust.blocking_reason, 'string');
-  assert(trust.blocking_reason.length > 0);
-  assert.equal(trust.installer_digest, null);
-  assert.equal(trust.installer_source_revision, null);
-} else {
-  assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
-  assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
-  assert.notEqual(trust.installer_source_revision, 'c8b68028a21e80a610b74ee3c41b442a69b84f97');
-  assert.equal(trust.core_revision, trust.installer_source_revision);
-  assert(!Object.hasOwn(trust, 'blocking_reason'));
-}
-assert.equal(trust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
-assert.equal(trust.cosign_version, 'v3.1.3-mtc.3');
-assert.match(trust.wasm_tools_sha256, /^[0-9a-f]{64}$/);
+const tab = manifest.contributions.operator_ui[0];
+assert.deepEqual(tab, {
+  id: 'health-and-intelligence',
+  slot: 'operator.sidebar.tab',
+  category: { id: 'monitoring' },
+  route: 'health-intelligence',
+  label: '健康和智商',
+  icon: 'heart',
+  renderer: 'typed_data_v1',
+  presentation: 'health_intelligence_v1',
+  data_endpoint: 'health-intelligence',
+});
 
-const cargo = readFileSync(join(root, 'Cargo.toml'), 'utf8');
-assert.match(cargo, /^name = "mtc-transient-health"$/m);
-assert.match(cargo, /^version = "1.0.0"$/m);
-assert.match(cargo, /^wit-bindgen = "=0\.57\.1"$/m);
+assert.equal(installerTrust.format_version, 1);
+assert.equal(installerTrust.status, 'ready');
+assert.equal(installerTrust.host_contract_revision, 'd5598638654fab18b91ae2067b7d5ae11e81ae29');
+assert.equal(installerTrust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
+assert.match(installerTrust.installer_digest, /^sha256:[0-9a-f]{64}$/);
+assert.match(installerTrust.installer_source_revision, /^[0-9a-f]{40}$/);
+assert.equal(installerTrust.cosign_version, 'v3.1.3-mtc.3');
+
+const sources = read('src/server/sources.ts');
+for (const expected of [
+  'https://codexradar.com/api/radar-insights',
+  'https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json',
+  'https://cdk.aixhan.com/api/public/check-cx/dashboard',
+]) assert(sources.includes(expected));
 
 const forbidden = [
   ['.example', 'invalid'].join('.'),
-  ['.svc', 'cluster', 'local'].join('.'),
-  ['cluster', 'local'].join('.'),
-  ['forgejo', 'svc'].join('.'),
-  ['/home/token', 'center-dev'].join('-'),
+  ['mtc-transient', 'health'].join('-'),
+  ['group-routing', 'v2'].join('-'),
+  ['<', 'iframe'].join(''),
+  ['dangerouslySet', 'InnerHTML'].join(''),
   ['BEGIN PRIVATE', 'KEY'].join(' '),
-  ['COSIGN', 'PASSWORD='].join('_'),
 ];
-const textExtensions = new Set(['.json', '.md', '.mjs', '.rs', '.toml', '.wit', '.yml', '.yaml']);
-function extension(path) {
-  const index = path.lastIndexOf('.');
-  return index < 0 ? '' : path.slice(index);
-}
+const textExtensions = new Set(['.json', '.md', '.mjs', '.ts', '.yml', '.yaml']);
 function scan(directory) {
   for (const name of readdirSync(directory)) {
-    if (name === '.git' || name === 'target' || name === 'mtc-core') continue;
+    if (name === '.git' || name === 'node_modules' || name === 'dist' || name === 'site' || name === 'mtc-core') continue;
     const path = join(directory, name);
     if (statSync(path).isDirectory()) {
       scan(path);
       continue;
     }
-    if (!textExtensions.has(extension(path))) continue;
+    if (!textExtensions.has(extname(path))) continue;
     const value = readFileSync(path, 'utf8');
     for (const needle of forbidden) {
       assert(!value.includes(needle), `${relative(root, path)} contains forbidden text: ${needle}`);
@@ -97,29 +93,14 @@ scan(root);
 
 const coreRoot = process.argv[2];
 if (coreRoot) {
-  const expected = readFileSync(join(coreRoot, 'wit/token-center.wit'));
-  const vendored = readFileSync(join(root, 'wit/token-center.wit'));
-  assert.deepEqual(vendored, expected, 'vendored WIT differs from pinned MTC core revision');
-  const coreManifestSchema = jsonFrom(join(coreRoot, 'schemas/plugin-manifest.schema.json'));
-  assert(coreManifestSchema.properties?.contributions?.properties?.group_routing,
-    'pinned MTC schema has no group_routing contribution');
-  const versions = coreManifestSchema.properties.contributions.properties.group_routing
-    .properties.version.enum;
-  assert(versions.includes('group-routing-v2'), 'pinned MTC schema lacks group-routing-v2');
-  const migration104 = readFileSync(join(coreRoot, 'migrations/common/0104_transient_health_signal_windows.sql'), 'utf8');
-  assert(migration104.includes('transient_window_ms'));
-  assert(migration104.includes('window_started_at'));
-  const routing = readFileSync(join(coreRoot, 'src/plugin/routing.rs'), 'utf8');
-  assert(routing.includes('DEFAULT_TRANSIENT_HEALTH_WINDOW_MS: u64 = 60_000'));
-  assert(routing.includes('MAX_TRANSIENT_HEALTH_WINDOW_MS: u64 = 300_000'));
-  assert(routing.includes('V2 shadow policy is observational only'));
-  const groupRouting = readFileSync(join(coreRoot, 'src/group_routing.rs'), 'utf8');
-  assert(groupRouting.includes('health_directives_enabled'));
-  assert(groupRouting.includes('return (core, native_recheck)'));
+  const coreSchema = JSON.parse(readFileSync(join(coreRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
+  const contributions = coreSchema.properties?.contributions?.properties;
+  assert(contributions?.service_data, 'pinned MTC schema lacks service_data');
+  assert(contributions?.operator_ui, 'pinned MTC schema lacks operator_ui');
+  const operatorUi = readFileSync(join(coreRoot, 'web/src/operator/pluginContributions.tsx'), 'utf8');
+  assert(operatorUi.includes("'health_intelligence_v1'"));
+  assert(operatorUi.includes("new Set(['codexradar', 'deepswe', 'aixhan'])"));
+  assert(operatorUi.includes("renderer === 'typed_data_v1'"));
 }
 
-function jsonFrom(path) {
-  return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-console.log('static contracts verified');
+console.log('health intelligence contracts verified');

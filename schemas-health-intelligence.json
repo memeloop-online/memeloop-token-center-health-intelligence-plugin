@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memeloop.dev/plugins/mtc-health-intelligence/v1/snapshot.schema.json",
+  "title": "Health and intelligence snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "sources"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "pageUrl", "endpoint", "status", "fetchedAt", "sourceUpdatedAt", "ageSeconds", "attempts", "error", "rows"],
+      "properties": {
+        "id": { "enum": ["codexradar", "deepswe", "aixhan"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "pageUrl": { "type": "string", "format": "uri" },
+        "endpoint": { "type": "string", "format": "uri" },
+        "status": { "enum": ["ok", "stale", "error"] },
+        "fetchedAt": { "type": "string", "format": "date-time" },
+        "sourceUpdatedAt": { "type": ["string", "null"], "format": "date-time" },
+        "ageSeconds": { "type": ["number", "null"], "minimum": 0 },
+        "attempts": { "type": "integer", "minimum": 0, "maximum": 12 },
+        "error": { "type": ["string", "null"], "maxLength": 256 },
+        "rows": {
+          "type": "array",
+          "maxItems": 24,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/codexRadarRow" },
+              { "$ref": "#/$defs/deepSweRow" },
+              { "$ref": "#/$defs/aixHanRow" }
+            ]
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "id": { "const": "codexradar" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/codexRadarRow" } } } } },
+        { "if": { "properties": { "id": { "const": "deepswe" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/deepSweRow" } } } } },
+        { "if": { "properties": { "id": { "const": "aixhan" } } }, "then": { "properties": { "rows": { "items": { "$ref": "#/$defs/aixHanRow" } } } } }
+      ]
+    },
+    "codexRadarRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "model", "effort", "iq", "softwareIq", "visualIq", "samples"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "effort": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "iq": { "type": "number", "minimum": 0, "maximum": 200 },
+        "softwareIq": { "type": ["number", "null"] },
+        "visualIq": { "type": ["number", "null"] },
+        "samples": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+      }
+    },
+    "deepSweRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "model", "effort", "passRate", "passAt4", "averageCostUsd", "outputTokens", "agentSteps", "samples"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "effort": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "passRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "passAt4": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "averageCostUsd": { "type": ["number", "null"], "minimum": 0, "maximum": 1000000 },
+        "outputTokens": { "type": ["number", "null"], "minimum": 0 },
+        "agentSteps": { "type": ["number", "null"], "minimum": 0 },
+        "samples": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+      }
+    },
+    "aixHanRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name", "model", "providerType", "status", "latencyMs", "pingLatencyMs", "checkedAt", "message"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "model": { "type": ["string", "null"], "maxLength": 160 },
+        "providerType": { "type": ["string", "null"], "maxLength": 160 },
+        "status": { "enum": ["operational", "degraded", "error", "unknown"] },
+        "latencyMs": { "type": ["number", "null"], "minimum": 0, "maximum": 86400000 },
+        "pingLatencyMs": { "type": ["number", "null"], "minimum": 0, "maximum": 86400000 },
+        "checkedAt": { "type": ["string", "null"], "format": "date-time" },
+        "message": { "type": ["string", "null"], "maxLength": 160 }
+      }
+    }
+  }
+}
