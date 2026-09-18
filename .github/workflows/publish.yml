@@ -48,13 +48,15 @@ jobs:
           const trust = JSON.parse(readFileSync('release/installer-trust.json', 'utf8'));
           if (trust.status !== 'ready'
               || !/^sha256:[0-9a-f]{64}$/.test(trust.installer_digest ?? '')
-              || !/^[0-9a-f]{40}$/.test(trust.installer_source_revision ?? '')) {
+              || !/^[0-9a-f]{40}$/.test(trust.installer_source_revision ?? '')
+              || !/^[0-9a-f]{40}$/.test(trust.minimum_installer_contract_revision ?? '')) {
             throw new Error('plugin publication requires reviewed installer trust');
           }
           appendFileSync(process.env.GITHUB_ENV, [
             `INSTALLER_SOURCE=${trust.installer_repository}`,
             `INSTALLER_DIGEST=${trust.installer_digest}`,
             `INSTALLER_SOURCE_REVISION=${trust.installer_source_revision}`,
+            `MINIMUM_INSTALLER_CONTRACT_REVISION=${trust.minimum_installer_contract_revision}`,
             `COSIGN_VERSION=${trust.cosign_version}`,
           ].join('\n') + '\n');
           NODE
@@ -65,8 +67,23 @@ jobs:
           ref: d5598638654fab18b91ae2067b7d5ae11e81ae29
           path: mtc-core
           persist-credentials: false
+      - name: Check out the pinned installer contract
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: memeloop-online/memeloop-token-center
+          ref: 48465eaf751ef479122ac262806a22ada15c37eb
+          path: mtc-installer-contract
+          fetch-depth: 0
+          persist-credentials: false
       - name: Verify the install-time host contract
-        run: node scripts/verify-static.mjs "$GITHUB_WORKSPACE/mtc-core"
+        run: |
+          test "$INSTALLER_SOURCE_REVISION" = "$(git -C "$GITHUB_WORKSPACE/mtc-installer-contract" rev-parse HEAD)"
+          git -C "$GITHUB_WORKSPACE/mtc-installer-contract" merge-base --is-ancestor \
+            "$MINIMUM_INSTALLER_CONTRACT_REVISION" \
+            "$INSTALLER_SOURCE_REVISION"
+          node scripts/verify-static.mjs \
+            "$GITHUB_WORKSPACE/mtc-core" \
+            "$GITHUB_WORKSPACE/mtc-installer-contract"
       - name: Install ORAS
         uses: oras-project/setup-oras@ccb71166b124a8452d1b72c4476398a909ed4d63 # main (reviewed immutable commit)
         with:

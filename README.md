@@ -97,7 +97,7 @@ CI 使用 Node 24，执行：
 ```text
 npm ci --ignore-scripts
 npm run check
-node scripts/verify-static.mjs <pinned-mtc-source>
+node scripts/verify-static.mjs <pinned-mtc-source> <pinned-installer-source>
 ```
 
-单元测试只读取 `test/fixtures`。清单校验固定到 MTC `d5598638654fab18b91ae2067b7d5ae11e81ae29`，覆盖当前 `service_data`、运行时 Operator 页签注册、`typed_data_v1` 和 `health_intelligence_v1` 契约。真实来源采集仅在 Pages 发布工作流执行。
+单元测试只读取 `test/fixtures`。清单校验固定到 MTC `d5598638654fab18b91ae2067b7d5ae11e81ae29`，发布校验同时读取签名安装器对应的源码契约，覆盖 `service_data`、运行时 Operator 页签注册、`typed_data_v1`、`health_intelligence_v1` 与服务数据 JSON Schema 子集。真实来源采集仅在 Pages 发布工作流执行。
