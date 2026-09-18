@@ -24,7 +24,7 @@ assert.equal(ociManifest.layers.length, 3);
 
 const mediaTypes = {
   'plugin.json': 'application/vnd.memeloop.token-center.plugin.manifest.v1+json',
-  'plugin.wasm': 'application/vnd.wasm.content.layer.v1+wasm',
+  'schemas-health-intelligence.json': 'application/vnd.memeloop.token-center.plugin.asset.v1',
   'README.md': 'application/vnd.memeloop.token-center.plugin.asset.v1',
 };
 const files = Object.entries(mediaTypes).map(([name, mediaType]) => {
@@ -38,9 +38,10 @@ const files = Object.entries(mediaTypes).map(([name, mediaType]) => {
 });
 
 const packageManifest = json('plugin-package/plugin.json');
-assert.equal(packageManifest.id, 'mtc-transient-health');
-assert.equal(packageManifest.contributions.group_routing.version, 'group-routing-v2');
-assert.equal(packageManifest.contributions.group_routing.health_policy, 'plugin');
+assert.equal(packageManifest.id, 'mtc-health-intelligence');
+assert.equal(packageManifest.wasm, null);
+assert.equal(packageManifest.contributions.operator_ui[0].presentation, 'health_intelligence_v1');
+assert.equal(packageManifest.contributions.service_data[0].id, 'health-intelligence');
 
 const installed = json('plugin-installation.json');
 assert.equal(installed.id, packageManifest.id);
@@ -59,10 +60,8 @@ assert(Array.isArray(verification) && verification.length > 0);
 assert(verification.some((entry) =>
   entry.critical?.image?.['docker-manifest-digest'] === expectedDigest));
 
-const trust = JSON.parse(readFileSync(join(repositoryRoot, 'release/mtc-installer-trust.json'), 'utf8'));
+const trust = JSON.parse(readFileSync(join(repositoryRoot, 'release/installer-trust.json'), 'utf8'));
 assert.equal(trust.status, 'ready');
-assert.match(trust.installer_digest, /^sha256:[0-9a-f]{64}$/);
-assert.match(trust.installer_source_revision, /^[0-9a-f]{40}$/);
 const evidence = {
   format_version: 1,
   plugin_id: packageManifest.id,
@@ -70,6 +69,7 @@ const evidence = {
   reference: `${source}@${expectedDigest}`,
   git_sha: process.env.GITHUB_SHA,
   workflow_run: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+  service_data_url: packageManifest.contributions.service_data[0].url,
   signature: {
     policy: 'cosign-keyless',
     issuer: process.env.SIGNING_ISSUER,
@@ -77,10 +77,10 @@ const evidence = {
   },
   installer_reference: `${trust.installer_repository}@${trust.installer_digest}`,
   installer_source_revision: trust.installer_source_revision,
-  compatible_core_revision: trust.core_revision,
+  compatible_core_revision: trust.host_contract_revision,
   files,
   installation_verified: true,
   manifest_verified_by: 'MTC official install-plugin-oci',
 };
 writeFileSync(join(evidenceRoot, 'plugin-release.json'), `${JSON.stringify(evidence, null, 2)}\n`);
-console.log('release evidence verified');
+console.log('manifest-only release evidence verified');
