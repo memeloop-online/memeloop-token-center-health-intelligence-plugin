@@ -58,6 +58,40 @@ describe('bounded public source collection', () => {
     expect(snapshot.sources[0]?.rows.length).toBeGreaterThan(0);
   });
 
+  it('keeps every cached source stale when refreshed payloads lose their expected rows', async () => {
+    let malformed = false;
+    const setup = fixtureFetch();
+    const fetch = async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (malformed && url.endsWith('/api/radar-insights')) {
+        return new Response(JSON.stringify({ comprehensive_points: [{ model: 'missing-fields' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (malformed && url.endsWith('/artifacts/v1.1/leaderboard-live.json')) {
+        return new Response(JSON.stringify({ rows: [{ model: 'missing-fields' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (malformed && url.endsWith('/api/public/check-cx/dashboard')) {
+        return new Response(JSON.stringify({ providerTimelines: [{ items: [] }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return setup.fetch(input, init);
+    };
+    const service = new SnapshotService({ fetch, now: fixedNow, sleep: noWait, policy });
+    const previous = await service.read();
+    malformed = true;
+    const snapshot = await service.read(true);
+    expect(snapshot.sources.map((source) => source.status)).toEqual(['stale', 'stale', 'stale']);
+    expect(snapshot.sources.map((source) => source.rows)).toEqual(previous.sources.map((source) => source.rows));
+    expect(snapshot.sources.every((source) => source.error?.includes('unsupported data shape'))).toBe(true);
+  });
+
   it('seeds stale data from the previously published snapshot', async () => {
     const healthy = fixtureFetch();
     const previous = await new SnapshotService({ fetch: healthy.fetch, now: fixedNow, sleep: noWait, policy }).read();
@@ -146,6 +180,11 @@ describe('SSRF and robots helpers', () => {
     expect(rules.allowed).toBe(true);
     expect(parseRobots('User-agent: *\nDisallow: /api/\n', 'https://codexradar.com/robots.txt', '/api/radar-insights').allowed).toBe(false);
     expect(parseRobots('User-agent: Googlebot\nUser-agent: *\nDisallow: /api/\n', 'https://codexradar.com/robots.txt', '/api/radar-insights').allowed).toBe(false);
+  });
+
+  it('keeps a user-agent group active across blank lines', () => {
+    const rules = parseRobots('User-agent: *\n\nDisallow: /api/\n', 'https://codexradar.com/robots.txt', '/api/radar-insights');
+    expect(rules.allowed).toBe(false);
   });
 
   it('classifies bounded HTTP failures without exposing response body text', async () => {

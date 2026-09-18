@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAixHan, normalizeCodexRadar, normalizeDeepSwe } from '../src/server/normalizers.js';
+import { InvalidPayloadError, normalizeAixHan, normalizeCodexRadar, normalizeDeepSwe } from '../src/server/normalizers.js';
 import { fixture } from './testUtils.js';
 
 describe('public source normalizers', () => {
@@ -32,5 +32,23 @@ describe('public source normalizers', () => {
     ] });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]?.model).toBe('<img>');
+  });
+
+  it('accepts explicit empty source collections', () => {
+    expect(normalizeCodexRadar({ comprehensive_points: [] }).rows).toEqual([]);
+    expect(normalizeDeepSwe({ rows: [] }).rows).toEqual([]);
+    expect(normalizeAixHan({ providerTimelines: [] }).rows).toEqual([]);
+  });
+
+  it('rejects a missing expected source collection', () => {
+    expect(() => normalizeCodexRadar({})).toThrow(InvalidPayloadError);
+    expect(() => normalizeDeepSwe({})).toThrow(InvalidPayloadError);
+    expect(() => normalizeAixHan({})).toThrow(InvalidPayloadError);
+  });
+
+  it('rejects non-empty source collections with no valid rows', () => {
+    expect(() => normalizeCodexRadar({ comprehensive_points: [{ model: 'missing-fields' }] })).toThrow(InvalidPayloadError);
+    expect(() => normalizeDeepSwe({ rows: [{ model: 'missing-fields' }] })).toThrow(InvalidPayloadError);
+    expect(() => normalizeAixHan({ providerTimelines: [{ items: [{ name: 'missing-status' }] }] })).toThrow(InvalidPayloadError);
   });
 });

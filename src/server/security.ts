@@ -92,11 +92,7 @@ export function parseRobots(text: string, sourceUrl: string, checkedPath: string
   for (const rawLine of text.split(/\r?\n/)) {
     if (++lines > 2_000) break;
     const line = rawLine.split('#', 1)[0]?.trim() ?? '';
-    if (!line) {
-      if (groupHasDirective) agents = [];
-      groupHasDirective = false;
-      continue;
-    }
+    if (!line) continue;
     const separator = line.indexOf(':');
     if (separator < 1) continue;
     const name = line.slice(0, separator).trim().toLowerCase();

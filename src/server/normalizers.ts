@@ -41,6 +41,11 @@ function array(value: unknown): readonly unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function requiredArray(value: unknown): readonly unknown[] {
+  if (!Array.isArray(value)) throw new InvalidPayloadError();
+  return value;
+}
+
 function text(value: unknown, fallback = ''): string {
   if (typeof value !== 'string') return fallback;
   return value
@@ -79,7 +84,7 @@ function requiredText(value: unknown): string | null {
 export function normalizeCodexRadar(payload: unknown): NormalizedCodexRadar {
   const body = record(payload);
   if (!body) throw new InvalidPayloadError();
-  const pointValues = array(body.comprehensive_points);
+  const pointValues = requiredArray(body.comprehensive_points);
   const rows: CodexRadarRow[] = [];
   for (const value of pointValues) {
     const point = record(value);
@@ -97,6 +102,7 @@ export function normalizeCodexRadar(payload: unknown): NormalizedCodexRadar {
       samples: point ? nonNegativeInteger(point.samples) : 0,
     });
   }
+  if (pointValues.length > 0 && rows.length === 0) throw new InvalidPayloadError();
   rows.sort((left, right) => right.iq - left.iq || left.key.localeCompare(right.key));
   return {
     sourceUpdatedAt: isoDate(body.source_updated_at) ?? isoDate(body.generated_at),
@@ -107,7 +113,7 @@ export function normalizeCodexRadar(payload: unknown): NormalizedCodexRadar {
 export function normalizeDeepSwe(payload: unknown): NormalizedDeepSwe {
   const body = record(payload);
   if (!body) throw new InvalidPayloadError();
-  const rowValues = array(body.rows);
+  const rowValues = requiredArray(body.rows);
   const rows: DeepSweRow[] = [];
   for (const value of rowValues) {
     const row = record(value);
@@ -131,6 +137,7 @@ export function normalizeDeepSwe(payload: unknown): NormalizedDeepSwe {
       samples: row ? nonNegativeInteger(row.n_attempted) : 0,
     });
   }
+  if (rowValues.length > 0 && rows.length === 0) throw new InvalidPayloadError();
   rows.sort((left, right) => right.passRate - left.passRate || left.key.localeCompare(right.key));
   return {
     sourceUpdatedAt: isoDate(body.generated_at),
@@ -147,7 +154,7 @@ function aixHanStatus(value: unknown): AixHanRow['status'] {
 export function normalizeAixHan(payload: unknown): NormalizedAixHan {
   const body = record(payload);
   if (!body) throw new InvalidPayloadError();
-  const timelines = array(body.providerTimelines);
+  const timelines = requiredArray(body.providerTimelines);
   const rows: AixHanRow[] = [];
   for (const value of timelines) {
     const timeline = record(value);
@@ -159,25 +166,28 @@ export function normalizeAixHan(payload: unknown): NormalizedAixHan {
         const leftTime = Date.parse(isoDate(left.checkedAt) ?? '') || 0;
         const rightTime = Date.parse(isoDate(right.checkedAt) ?? '') || 0;
         return rightTime - leftTime;
-      });
+    });
     const item = timelineItems[0];
     if (!item) continue;
-    const name = requiredText(item.name) ?? requiredText(timeline.name) ?? 'Unnamed provider';
+    const name = requiredText(item.name) ?? requiredText(timeline.name);
+    const status = requiredText(item.status);
+    if (!name || !status) continue;
     const checkedAt = isoDate(item.checkedAt);
     const latency = finiteNumber(item.latencyMs);
     const pingLatency = finiteNumber(item.pingLatencyMs);
     rows.push({
-      key: text(item.id, name).slice(0, 180),
+      key: (requiredText(item.id) ?? name).slice(0, 180),
       name,
       model: requiredText(item.model),
       providerType: requiredText(item.type),
-      status: aixHanStatus(item.status),
+      status: aixHanStatus(status),
       latencyMs: latency !== null && latency >= 0 && latency <= 86_400_000 ? latency : null,
       pingLatencyMs: pingLatency !== null && pingLatency >= 0 && pingLatency <= 86_400_000 ? pingLatency : null,
       checkedAt,
       message: requiredText(item.message),
     });
   }
+  if (timelines.length > 0 && rows.length === 0) throw new InvalidPayloadError();
   rows.sort((left, right) => {
     const rank: Record<AixHanRow['status'], number> = { error: 0, degraded: 1, unknown: 2, operational: 3 };
     return rank[left.status] - rank[right.status] || left.key.localeCompare(right.key);
