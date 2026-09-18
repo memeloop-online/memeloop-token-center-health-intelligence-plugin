@@ -77,7 +77,8 @@ const forbidden = [
 const textExtensions = new Set(['.json', '.md', '.mjs', '.ts', '.yml', '.yaml']);
 function scan(directory) {
   for (const name of readdirSync(directory)) {
-    if (name === '.git' || name === 'node_modules' || name === 'dist' || name === 'site' || name === 'mtc-core') continue;
+    if (name === '.git' || name === 'node_modules' || name === 'dist' || name === 'site'
+        || name === 'mtc-core' || name === 'mtc-installer-contract') continue;
     const path = join(directory, name);
     if (statSync(path).isDirectory()) {
       scan(path);
