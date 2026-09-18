@@ -1,6 +1,6 @@
 {
   "id": "mtc-health-intelligence",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "wit_version": "0.2.0",
   "wasm": null,
   "capabilities": [
@@ -126,7 +126,7 @@
           "sources": [
             {
               "id": "codexradar",
-              "label": "Codex Radar 智商",
+              "label": "Codex Radar 模型能力",
               "pageUrl": "https://codexradar.com/",
               "endpoint": "https://codexradar.com/api/radar-insights",
               "status": "error",
@@ -176,7 +176,7 @@
         "slot": "operator.sidebar.tab",
         "category": { "id": "monitoring" },
         "route": "health-intelligence",
-        "label": "健康和智商",
+        "label": "模型健康与能力",
         "icon": "heart",
         "renderer": "typed_data_v1",
         "presentation": "health_intelligence_v1",

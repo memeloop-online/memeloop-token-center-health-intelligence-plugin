@@ -1,6 +1,6 @@
-# MTC 健康和智商
+# MTC 模型健康与能力
 
-`mtc-health-intelligence` 是 MemeLoop Token Center 的官方 TypeScript 插件示例。安装后，它在 Operator 的“监控”分类注册“健康和智商”页签，将三个公开来源汇总为一个类型化数据视图：
+`mtc-health-intelligence` 是 MemeLoop Token Center 的官方 TypeScript 插件示例。安装后，它在 Operator 的“监控”分类注册“模型健康与能力”页签，将三个公开来源汇总为一个类型化数据视图：
 
 - [Codex Radar](https://codexradar.com/)：综合 IQ 与样本量。
 - [DeepSWE](https://deepswe.datacurve.ai/)：软件工程任务通过率与 Agent 步数。
@@ -17,7 +17,7 @@
   -> TypeScript 规范化与字段裁剪
   -> /api/health-intelligence 类型化快照
   -> MTC service_data 代理
-  -> Operator“健康和智商”页签
+  -> Operator“模型健康与能力”页签
 ```
 
 根目录的 [`plugin.json`](plugin.json) 使用当前 MTC 清单契约：
@@ -49,7 +49,7 @@ GitHub Pages 工作流每十分钟生成一次快照。单个来源短暂失败�
 ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest>
 ```
 
-发布前工作流会验证 Pages API、当前 MTC 清单契约和固定安装器信任；发布后使用官方 `install-plugin-oci` 对签名字节执行干净重装。安装并刷新插件清单后，“健康和智商”会出现在 Operator 的“监控”分类。
+发布前工作流会验证 Pages API、当前 MTC 清单契约和固定安装器信任；发布后使用官方 `install-plugin-oci` 对签名字节执行干净重装。安装并刷新插件清单后，“模型健康与能力”会出现在 Operator 的“监控”分类。
 
 ## API 契约
 
@@ -67,7 +67,7 @@ ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:
 }
 ```
 
-每个来源包含固定的 `pageUrl` 与 `endpoint`、采集时间、来源更新时间、状态、尝试次数和最多 24 条规范化记录。原始响应、HTML、Cookie、授权头与来源凭据均不进入快照。
+每个来源包含固定的 `pageUrl` 与 `endpoint`、采集时间、来源更新时间、状态、尝试次数和最多 24 条规范化记录。快照只保留供 Operator 展示的规范化字段。
 
 服务也可以作为常驻 Node 进程运行：
 
@@ -83,12 +83,12 @@ PORT=8080 npm run serve
 
 来源列表位于 [`src/server/sources.ts`](src/server/sources.ts)，请求前由 [`src/server/security.ts`](src/server/security.ts) 校验：
 
-- 仅允许三个已审查的 HTTPS origin 与固定路径。
-- 禁用重定向，省略浏览器凭据，并发送固定 User-Agent。
+- 三个已审查的 HTTPS origin 与固定路径构成来源清单。
+- 请求采用固定 User-Agent、无浏览器会话的公开读取方式，并直接读取来源端点。
 - 单次请求超时 4 秒，瞬态失败最多重试两次。
 - JSON 响应上限为 2 MiB，`robots.txt` 上限为 64 KiB。
 - 内存缓存有效期为 5 分钟；刷新失败时可返回上一次规范化数据并标记为 `stale`。
-- 错误信息只保留有限分类，不回传上游响应正文。
+- Operator 接收稳定的错误分类，便于展示和筛选。
 
 ## 开发与验证
 
