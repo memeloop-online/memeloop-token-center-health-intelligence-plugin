@@ -56,6 +56,7 @@ assert.equal(installerTrust.host_contract_revision, 'd5598638654fab18b91ae2067b7
 assert.equal(installerTrust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
 assert.match(installerTrust.installer_digest, /^sha256:[0-9a-f]{64}$/);
 assert.match(installerTrust.installer_source_revision, /^[0-9a-f]{40}$/);
+assert.equal(installerTrust.minimum_installer_contract_revision, 'd21f73377f96197fea9f0c34b7a93836458d81af');
 assert.equal(installerTrust.cosign_version, 'v3.1.3-mtc.3');
 
 const sources = read('src/server/sources.ts');
@@ -101,6 +102,40 @@ if (coreRoot) {
   assert(operatorUi.includes("'health_intelligence_v1'"));
   assert(operatorUi.includes("new Set(['codexradar', 'deepswe', 'aixhan'])"));
   assert(operatorUi.includes("renderer === 'typed_data_v1'"));
+}
+
+const installerRoot = process.argv[3];
+if (installerRoot) {
+  const installerManifestSchema = JSON.parse(readFileSync(join(installerRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
+  const contributions = installerManifestSchema.properties?.contributions?.properties;
+  assert(contributions?.service_data, 'pinned installer schema lacks service_data');
+  assert(contributions?.operator_ui, 'pinned installer schema lacks operator_ui');
+  assert(contributions.operator_ui.items?.properties?.presentation?.enum?.includes('health_intelligence_v1'),
+    'pinned installer schema lacks health_intelligence_v1');
+
+  const pluginSource = readFileSync(join(installerRoot, 'src/plugin.rs'), 'utf8');
+  assert(pluginSource.includes('HealthIntelligenceV1'), 'pinned installer runtime lacks health_intelligence_v1');
+  assert(pluginSource.includes('validate_service_data_contributions(manifest)?'),
+    'pinned installer runtime lacks authoritative service_data validation');
+
+  const schemaSource = readFileSync(join(installerRoot, 'src/schema.rs'), 'utf8');
+  const supportedExpression = schemaSource.match(/matches!\(format,\s*([^)]+)\)/s)?.[1];
+  assert(supportedExpression, 'could not read pinned installer JSON Schema format allowlist');
+  const supportedFormats = new Set([...supportedExpression.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+  const declaredFormats = new Set();
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (typeof value.format === 'string') declaredFormats.add(value.format);
+    Object.values(value).forEach(visit);
+  };
+  visit(endpoint.response_schema);
+  for (const format of declaredFormats) {
+    assert(supportedFormats.has(format), `response schema format ${format} is unsupported by the pinned installer`);
+  }
 }
 
 console.log('health intelligence contracts verified');

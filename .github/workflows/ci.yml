@@ -38,8 +38,25 @@ jobs:
           ref: d5598638654fab18b91ae2067b7d5ae11e81ae29
           path: mtc-core
           persist-credentials: false
-      - name: Verify manifest against the pinned host
-        run: node scripts/verify-static.mjs "$GITHUB_WORKSPACE/mtc-core"
+      - name: Check out the pinned installer contract
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: memeloop-online/memeloop-token-center
+          ref: 48465eaf751ef479122ac262806a22ada15c37eb
+          path: mtc-installer-contract
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify manifest against the host and installer contracts
+        run: |
+          test "$(node -p "require('./release/installer-trust.json').installer_source_revision")" = \
+            "$(git -C "$GITHUB_WORKSPACE/mtc-installer-contract" rev-parse HEAD)"
+          minimum_revision=$(node -p "require('./release/installer-trust.json').minimum_installer_contract_revision")
+          git -C "$GITHUB_WORKSPACE/mtc-installer-contract" merge-base --is-ancestor \
+            "$minimum_revision" \
+            48465eaf751ef479122ac262806a22ada15c37eb
+          node scripts/verify-static.mjs \
+            "$GITHUB_WORKSPACE/mtc-core" \
+            "$GITHUB_WORKSPACE/mtc-installer-contract"
       - name: Create review package
         run: npm pack --ignore-scripts --pack-destination dist
       - name: Upload review package
