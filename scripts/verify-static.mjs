@@ -11,7 +11,7 @@ const reviewedSchema = json('schemas-health-intelligence.json');
 const installerTrust = json('release/installer-trust.json');
 
 assert.equal(manifest.id, 'mtc-health-intelligence');
-assert.equal(manifest.version, '1.0.0');
+assert.equal(manifest.version, '1.0.1');
 assert.equal(manifest.wit_version, '0.2.0');
 assert.equal(manifest.wasm, null);
 assert.deepEqual(manifest.capabilities, [{
@@ -43,7 +43,7 @@ assert.deepEqual(tab, {
   slot: 'operator.sidebar.tab',
   category: { id: 'monitoring' },
   route: 'health-intelligence',
-  label: '健康和智商',
+  label: '模型健康与能力',
   icon: 'heart',
   renderer: 'typed_data_v1',
   presentation: 'health_intelligence_v1',

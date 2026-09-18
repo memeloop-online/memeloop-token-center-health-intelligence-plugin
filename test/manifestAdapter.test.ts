@@ -20,7 +20,7 @@ describe('core contribution adapter', () => {
       slot: 'operator.sidebar.tab',
       category: { id: 'monitoring' },
       route: 'health-intelligence',
-      label: '健康和智商',
+      label: '模型健康与能力',
       icon: 'heart',
       renderer: 'typed_data_v1',
       presentation: HEALTH_INTELLIGENCE_PRESENTATION,

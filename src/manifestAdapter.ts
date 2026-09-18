@@ -27,7 +27,7 @@ export interface HealthIntelligenceTabContribution {
   readonly slot: 'operator.sidebar.tab';
   readonly category: { readonly id: 'monitoring' };
   readonly route: 'health-intelligence';
-  readonly label: '健康和智商';
+  readonly label: '模型健康与能力';
   readonly icon: 'heart';
   readonly renderer: 'typed_data_v1';
   readonly presentation: typeof HEALTH_INTELLIGENCE_PRESENTATION;
@@ -119,7 +119,7 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     || category.id !== 'monitoring'
     || Object.prototype.hasOwnProperty.call(category, 'label')
     || candidate.route !== 'health-intelligence'
-    || candidate.label !== '健康和智商'
+    || candidate.label !== '模型健康与能力'
     || candidate.icon !== 'heart'
     || candidate.renderer !== CORE_UI_CONTRACT
     || candidate.presentation !== HEALTH_INTELLIGENCE_PRESENTATION
@@ -133,7 +133,7 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     slot: 'operator.sidebar.tab',
     category: { id: 'monitoring' },
     route: 'health-intelligence',
-    label: '健康和智商',
+    label: '模型健康与能力',
     icon: 'heart',
     renderer: 'typed_data_v1',
     presentation: HEALTH_INTELLIGENCE_PRESENTATION,

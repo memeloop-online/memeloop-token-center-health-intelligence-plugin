@@ -1,6 +1,6 @@
 {
   "name": "@memeloop/mtc-health-intelligence",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official MTC health and intelligence plugin with a typed three-source public API",
   "type": "module",
   "engines": {

@@ -12,7 +12,7 @@ export interface SourceSpec extends FixedEndpoint {
 const specs: Record<SourceId, SourceSpec> = {
   codexradar: {
     source: 'codexradar',
-    label: 'Codex Radar 智商',
+    label: 'Codex Radar 模型能力',
     pageUrl: 'https://codexradar.com/',
     endpoint: 'https://codexradar.com/api/radar-insights',
     robotsUrl: 'https://codexradar.com/robots.txt',
