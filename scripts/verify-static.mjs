@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (path) => readFileSync(join(root, path), 'utf8');
@@ -105,6 +105,22 @@ if (coreRoot) {
   assert(contributions?.operator_ui, 'pinned MTC schema lacks operator_ui');
   const operatorUi = readFileSync(join(coreRoot, 'web/src/operator/pluginContributions.tsx'), 'utf8');
   assert(operatorUi.includes("renderer === 'component_v1'"));
+  const sdk = await import(pathToFileURL(join(coreRoot, 'web/operator-ui-sdk/index.js')).href);
+  const module = await import(pathToFileURL(join(root, tab.module_entry)).href);
+  const uiPackage = await module.activateOperatorUi({
+    apiVersion: sdk.OPERATOR_UI_PACKAGE_API_V1,
+    React: {},
+    Fluent: { tokens: {}, makeStyles: () => () => ({}) },
+    defineOperatorUiPackage: sdk.defineOperatorUiPackage,
+  });
+  assert(sdk.operatorUiPackageSupportsManifest(uiPackage, manifest.id, manifest.version),
+    'UI package identity must satisfy the actual pinned host SDK');
+  assert.equal(typeof uiPackage.components[tab.component_id], 'function');
+  assert.equal(module.MAX_SOURCES, reviewedSchema.properties.sources.maxItems);
+  assert.equal(module.MAX_ROWS, reviewedSchema.$defs.source.properties.rows.maxItems);
+  const host = readFileSync(join(coreRoot, 'web/src/plugins/OperatorPluginComponentHost.tsx'), 'utf8');
+  assert(host.includes('loadServiceData(endpointId: string, signal?: AbortSignal)'));
+  assert(host.includes('Fluent: FluentRuntime') && host.includes('React: ReactRuntime'));
 }
 
 const installerRoot = process.argv[3];

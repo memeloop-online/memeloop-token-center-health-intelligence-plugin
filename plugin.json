@@ -41,6 +41,7 @@
             },
             "sources": {
               "type": "array",
+              "maxItems": 64,
               "items": {
                 "$ref": "#/$defs/source"
               }
@@ -75,10 +76,12 @@
                 },
                 "pageUrl": {
                   "type": "string",
+                  "pattern": "^https://[^\\s/@?#\\\\]+(?:/[^\\s?#\\\\]*)?$",
                   "format": "uri"
                 },
                 "endpoint": {
                   "type": "string",
+                  "pattern": "^https://[^\\s/@?#\\\\]+(?:/[^\\s?#\\\\]*)?$",
                   "format": "uri"
                 },
                 "status": {

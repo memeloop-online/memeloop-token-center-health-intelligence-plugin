@@ -3,6 +3,7 @@ import { SnapshotService } from '../src/server/fetcher.js';
 import { createSourceRegistry, SOURCE_REGISTRY, type SourceSpec } from '../src/server/sources.js';
 import { decodeSnapshot } from '../src/server/decodeSnapshot.js';
 import { fixtureFetch, fixedNow } from './testUtils.js';
+import { MAX_SOURCES, MAX_ROWS, MAX_CLOCK_SKEW_MS } from '../src/shared/limits.js';
 
 const extra: SourceSpec = {
   source: 'community-benchmark', label: 'Community benchmark',
@@ -45,5 +46,35 @@ describe('source extensions and snapshot freshness', () => {
       fetch: async () => new Response('{}'),
     }).read();
     expect(snapshot.sources[0]?.status).toBe('stale');
+  });
+
+  it('applies the row cap and scalar validation to every registered normalizer', async () => {
+    const service = (rows: unknown) => new SnapshotService({ now: fixedNow,
+      sources: [{ ...extra, normalize: () => ({ sourceUpdatedAt: null, rows: rows as never }) }],
+      fetch: async () => new Response('{}') });
+    const capped = await service(Array.from({ length: MAX_ROWS + 10 }, (_, index) => ({ key: `${index}`, score: index }))).read();
+    expect(capped.sources[0]?.rows).toHaveLength(MAX_ROWS);
+    const malformed = await service([{ key: 'invalid', nested: { payload: 'raw data' } }]).read();
+    expect(malformed.sources[0]?.status).toBe('error');
+    expect(malformed.sources[0]?.rows).toEqual([]);
+  });
+
+  it('rejects oversized source lists and unsafe source links at snapshot decode', async () => {
+    const snapshot = await new SnapshotService({ now: fixedNow, fetch: fixtureFetch().fetch }).read();
+    expect(() => decodeSnapshot({ ...snapshot, sources: Array(MAX_SOURCES + 1).fill(snapshot.sources[0]) }, fixedNow().getTime())).toThrow();
+    for (const pageUrl of ['javascript:alert(1)', 'https://user@host.test/', 'https://host.test/?x=1', 'https://host.test/#x']) {
+      expect(() => decodeSnapshot({ ...snapshot, sources: [{ ...snapshot.sources[0], pageUrl }] }, fixedNow().getTime())).toThrow();
+    }
+  });
+
+  it('rejects future snapshot clocks and marks future source timestamps stale', async () => {
+    const now = fixedNow().getTime();
+    const snapshot = await new SnapshotService({ now: fixedNow, fetch: fixtureFetch().fetch }).read();
+    const future = new Date(now + MAX_CLOCK_SKEW_MS + 1).toISOString();
+    expect(() => decodeSnapshot({ ...snapshot, generatedAt: future }, now)).toThrow();
+    for (const field of ['fetchedAt', 'sourceUpdatedAt']) {
+      const result = decodeSnapshot({ ...snapshot, sources: [{ ...snapshot.sources[0], [field]: future }] }, now);
+      expect(result.sources[0]?.status).toBe('stale');
+    }
   });
 });

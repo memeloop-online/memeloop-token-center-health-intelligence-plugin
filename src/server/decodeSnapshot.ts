@@ -7,6 +7,8 @@ import type {
   SourceSnapshot,
 } from '../shared/types.js';
 import { isSourceId, type SourceRow } from '../shared/types.js';
+import { MAX_SOURCES, MAX_ROWS, MAX_CLOCK_SKEW_MS } from '../shared/limits.js';
+import { scalarRow } from '../shared/rows.js';
 import { refreshSourceStatus } from '../shared/freshness.js';
 
 export class SnapshotDecodeError extends Error {
@@ -64,7 +66,8 @@ function publicUrl(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.username === '' && url.password === '';
+    return url.protocol === 'https:' && url.username === '' && url.password === ''
+      && url.search === '' && url.hash === '' && !/[\u0000-\u0020\u007f\\]/u.test(value);
   } catch { return false; }
 }
 
@@ -106,21 +109,13 @@ const rowDecoders: Record<string, (value: unknown) => SourceRow | null> = {
   codexradar: codexRadarRow, deepswe: deepSweRow, aixhan: aixHanRow,
 };
 
-function scalarRow(value: unknown): SourceRow | null {
-  const row = record(value);
-  if (!row || !text(row.key, 180) || Object.keys(row).length > 32) return null;
-  if (!Object.values(row).every((cell) => cell === null || typeof cell === 'boolean'
-    || number(cell) || (typeof cell === 'string' && cell.length <= 256))) return null;
-  return row as SourceRow;
-}
-
 function source(value: unknown): SourceSnapshot | null {
   const candidate = record(value);
   if (!candidate || typeof candidate.id !== 'string' || !isSourceId(candidate.id)
-    || !sourceMeta(candidate, candidate.id) || !Array.isArray(candidate.rows) || candidate.rows.length > 24) return null;
+    || !sourceMeta(candidate, candidate.id) || !Array.isArray(candidate.rows) || candidate.rows.length > MAX_ROWS) return null;
   const id = candidate.id;
   const decode = Object.hasOwn(rowDecoders, id) ? rowDecoders[id]! : scalarRow;
-  const rows = candidate.rows.map(decode);
+  const rows = candidate.rows.map((row) => scalarRow(row) && decode(row));
   if (rows.some((row) => row === null)) return null;
   return { ...candidate, id, rows } as unknown as SourceSnapshot;
 }
@@ -129,7 +124,8 @@ export function decodeSnapshot(value: unknown, now = Date.now()): HealthIntellig
   const root = record(value);
   const rawSources = root?.sources;
   if (!root || root.schemaVersion !== 1 || !date(root.generatedAt)
-    || !Array.isArray(rawSources)) throw new SnapshotDecodeError();
+    || Date.parse(root.generatedAt) > now + MAX_CLOCK_SKEW_MS
+    || !Array.isArray(rawSources) || rawSources.length > MAX_SOURCES) throw new SnapshotDecodeError();
   const sources = rawSources.map(source);
   if (sources.some((entry) => entry === null)) throw new SnapshotDecodeError();
   if (new Set(sources.map((entry) => entry!.id)).size !== sources.length) throw new SnapshotDecodeError();

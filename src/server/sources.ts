@@ -1,5 +1,6 @@
 import type { SourceId, SourceRow } from '../shared/types.js';
 import { isSourceId } from '../shared/types.js';
+import { MAX_SOURCES } from '../shared/limits.js';
 import { normalizeCodexRadar, normalizeDeepSwe, normalizeAixHan } from './normalizers.js';
 import {
   assertFixedEndpoint,
@@ -47,6 +48,7 @@ const specs: Record<SourceId, SourceSpec> = {
 };
 
 export function createSourceRegistry(entries: readonly SourceSpec[]): ReadonlyMap<SourceId, SourceSpec> {
+  if (entries.length > MAX_SOURCES) throw new Error(`source registry supports up to ${MAX_SOURCES} entries`);
   const registry = new Map<SourceId, SourceSpec>();
   for (const spec of entries) {
     const allowed = new Set([new URL(spec.pageUrl).origin]);

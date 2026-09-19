@@ -4,6 +4,25 @@ const COMPONENT_ID = 'health-intelligence';
 const ENDPOINT_ID = 'health-intelligence';
 const TICK_INTERVAL_MS = 30 * 1000;
 const STALE_FETCH_AGE_MS = 20 * 60 * 1000;
+export const MAX_SOURCES = 64;
+export const MAX_ROWS = 24;
+export const MAX_CLOCK_SKEW_MS = 5 * 60_000;
+
+export function safeSourceHref(value) {
+  if (typeof value !== 'string' || /[\u0000-\u0020\u007f\\]/u.test(value)) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.username === '' && url.password === ''
+      && url.search === '' && url.hash === '' ? url.href : null;
+  } catch { return null; }
+}
+
+export function snapshotSources(value) {
+  if (!value || !Array.isArray(value.sources) || value.sources.length > MAX_SOURCES) {
+    throw new Error('Health data needs a valid source list');
+  }
+  return value.sources;
+}
 
 const STRINGS = {
   title: { en: 'Model health & intelligence', zh: '模型健康与能力' },
@@ -62,11 +81,12 @@ function columnsOf(rows) {
   return columns;
 }
 
-function isRuntimeStale(source, now) {
+export function isRuntimeStale(source, now) {
   const fetched = Date.parse(source && source.fetchedAt);
-  if (!Number.isFinite(fetched) || now - fetched > STALE_FETCH_AGE_MS) return true;
+  if (!Number.isFinite(fetched) || fetched > now + MAX_CLOCK_SKEW_MS
+      || now - fetched > STALE_FETCH_AGE_MS) return true;
   const updated = source && source.sourceUpdatedAt == null ? fetched : Date.parse(source.sourceUpdatedAt);
-  if (!Number.isFinite(updated)) return true;
+  if (!Number.isFinite(updated) || updated > now + MAX_CLOCK_SKEW_MS) return true;
   const maxAge = Number(source && source.maxObservationAgeSeconds);
   if (Number.isFinite(updated) && Number.isFinite(maxAge) && maxAge >= 0
       && now - updated > maxAge * 1000) return true;
@@ -191,7 +211,8 @@ export function activateOperatorUi(host) {
       props.api.loadServiceData(ENDPOINT_ID, controller.signal).then((response) => {
         if (!active) return;
         const data = response && response.data;
-        setSnapshot(data && Array.isArray(data.sources) ? data : null);
+        snapshotSources(data);
+        setSnapshot(data);
         setFailure(null);
         setInitialLoading(false);
         setRefreshing(false);
@@ -265,10 +286,10 @@ export function activateOperatorUi(host) {
           h(Button, { appearance: 'secondary', onClick: reload }, text(STRINGS.tryAgain))));
     }
 
-    const sources = snapshot ? snapshot.sources : [];
+    const sources = snapshot ? snapshotSources(snapshot) : [];
 
     const renderTable = (source) => {
-      const rows = Array.isArray(source.rows) ? source.rows : [];
+      const rows = Array.isArray(source.rows) ? source.rows.slice(0, MAX_ROWS) : [];
       if (rows.length === 0) {
         return h(Caption1, null, text(STRINGS.emptyRows));
       }
@@ -285,6 +306,7 @@ export function activateOperatorUi(host) {
 
     const renderSource = (source) => {
       const status = effectiveStatus(source, now);
+      const sourceHref = safeSourceHref(source.pageUrl);
       const metaItems = [
         `${text(STRINGS.fetchedAt)}: ${formatDate(source.fetchedAt)}`,
         `${text(STRINGS.sourceUpdatedAt)}: ${formatDate(source.sourceUpdatedAt)}`,
@@ -296,8 +318,8 @@ export function activateOperatorUi(host) {
           h(Badge, { appearance: 'filled', color: BADGE_COLORS[status] }, text(STRINGS[status]))),
         h('div', { className: styles.meta },
           metaItems.map((item) => h(Caption1, { key: item }, item)),
-          source.pageUrl
-            ? h(Link, { href: source.pageUrl, target: '_blank', rel: 'noopener noreferrer' }, text(STRINGS.openPage))
+          sourceHref
+            ? h(Link, { href: sourceHref, target: '_blank', rel: 'noopener noreferrer' }, text(STRINGS.openPage))
             : null),
         renderTable(source));
     };

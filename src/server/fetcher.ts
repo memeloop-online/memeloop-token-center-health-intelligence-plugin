@@ -5,6 +5,7 @@ import type {
 } from '../shared/types.js';
 import { InvalidPayloadError } from './normalizers.js';
 import { refreshSourceStatus } from '../shared/freshness.js';
+import { normalizedRows } from '../shared/rows.js';
 import {
   assertExactAllowedOrigin,
   parseRobots,
@@ -391,7 +392,8 @@ export class SnapshotService {
       }
       const result = await fetchJson(spec.endpoint, this.options);
       attempts += result.attempts;
-      const normalized = spec.normalize(result.body);
+      const resultRows = spec.normalize(result.body);
+      const normalized = { ...resultRows, rows: normalizedRows(resultRows.rows) };
       const completedAt = this.options.now();
       const fetchedAt = completedAt.toISOString();
       this.cache.set(id, {
