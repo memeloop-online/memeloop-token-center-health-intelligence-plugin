@@ -368,7 +368,7 @@ export class SnapshotService {
     const values = await Promise.all([...this.sources.values()].map((spec) => this.readSource(spec, now, force)));
     return {
       schemaVersion: 1,
-      generatedAt: now.toISOString(),
+      generatedAt: this.options.now().toISOString(),
       sources: values,
     };
   }
@@ -392,13 +392,14 @@ export class SnapshotService {
       const result = await fetchJson(spec.endpoint, this.options);
       attempts += result.attempts;
       const normalized = spec.normalize(result.body);
-      const fetchedAt = this.options.now().toISOString();
+      const completedAt = this.options.now();
+      const fetchedAt = completedAt.toISOString();
       this.cache.set(id, {
         sourceUpdatedAt: normalized.sourceUpdatedAt,
         fetchedAt,
         rows: normalized.rows,
       });
-      return sourceSnapshot(spec, 'ok', fetchedAt, normalized.sourceUpdatedAt, normalized.rows, attempts, null, now);
+      return sourceSnapshot(spec, 'ok', fetchedAt, normalized.sourceUpdatedAt, normalized.rows, attempts, null, completedAt);
     } catch (error) {
       attempts += error instanceof SourceFetchError ? error.attempts : 0;
       const failure = publicError(error);

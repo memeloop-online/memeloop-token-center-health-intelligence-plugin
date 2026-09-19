@@ -65,7 +65,8 @@ function columnsOf(rows) {
 function isRuntimeStale(source, now) {
   const fetched = Date.parse(source && source.fetchedAt);
   if (!Number.isFinite(fetched) || now - fetched > STALE_FETCH_AGE_MS) return true;
-  const updated = Date.parse(source && source.sourceUpdatedAt);
+  const updated = source && source.sourceUpdatedAt == null ? fetched : Date.parse(source.sourceUpdatedAt);
+  if (!Number.isFinite(updated)) return true;
   const maxAge = Number(source && source.maxObservationAgeSeconds);
   if (Number.isFinite(updated) && Number.isFinite(maxAge) && maxAge >= 0
       && now - updated > maxAge * 1000) return true;
@@ -296,7 +297,7 @@ export function activateOperatorUi(host) {
         h('div', { className: styles.meta },
           metaItems.map((item) => h(Caption1, { key: item }, item)),
           source.pageUrl
-            ? h(Link, { href: source.pageUrl, target: '_blank', rel: 'noreferrer' }, text(STRINGS.openPage))
+            ? h(Link, { href: source.pageUrl, target: '_blank', rel: 'noopener noreferrer' }, text(STRINGS.openPage))
             : null),
         renderTable(source));
     };

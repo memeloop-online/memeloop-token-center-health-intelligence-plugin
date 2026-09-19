@@ -102,6 +102,7 @@
               }
             },
             "additionalProperties": {
+              "maxLength": 256,
               "type": [
                 "string",
                 "number",

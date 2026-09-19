@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +97,8 @@ scan(root);
 
 const coreRoot = process.argv[2];
 if (coreRoot) {
+  assert.equal(execFileSync('git', ['-C', coreRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    installerTrust.host_contract_revision, 'host checkout differs from the reviewed trust revision');
   const coreSchema = JSON.parse(readFileSync(join(coreRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
   const contributions = coreSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned MTC schema lacks service_data');
@@ -106,6 +109,8 @@ if (coreRoot) {
 
 const installerRoot = process.argv[3];
 if (installerRoot) {
+  assert.equal(execFileSync('git', ['-C', installerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    installerTrust.installer_source_revision, 'installer checkout differs from the reviewed trust revision');
   const installerManifestSchema = JSON.parse(readFileSync(join(installerRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
   const contributions = installerManifestSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned installer schema lacks service_data');
