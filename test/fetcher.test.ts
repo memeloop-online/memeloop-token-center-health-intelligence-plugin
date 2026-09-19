@@ -98,7 +98,7 @@ describe('bounded public source collection', () => {
     const failing = fixtureFetch(undefined, undefined, { codexradar: 503 });
     const next = await new SnapshotService({
       fetch: failing.fetch,
-      now: () => new Date('2026-09-07T16:10:00.000Z'),
+      now: () => new Date(fixedNow().getTime() + 10 * 60_000),
       sleep: noWait,
       policy,
       initialSnapshot: previous,

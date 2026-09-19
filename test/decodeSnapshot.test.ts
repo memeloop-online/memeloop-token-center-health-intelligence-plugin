@@ -12,7 +12,7 @@ describe('published snapshot decoder', () => {
       sleep: async () => undefined,
       policy: { timeoutMs: 250, retryDelayMs: [0, 0] },
     }).read();
-    expect(decodeSnapshot(snapshot)).toEqual(snapshot);
+    expect(decodeSnapshot(snapshot, fixedNow().getTime())).toEqual(snapshot);
   });
 
   it('rejects a row type assigned to the wrong source', async () => {
@@ -24,7 +24,7 @@ describe('published snapshot decoder', () => {
       policy: { timeoutMs: 250, retryDelayMs: [0, 0] },
     }).read();
     const invalid = structuredClone(snapshot);
-    invalid.sources[0].rows = invalid.sources[1].rows as never;
+    invalid.sources[0]!.rows = invalid.sources[1]!.rows;
     expect(() => decodeSnapshot(invalid)).toThrow(SnapshotDecodeError);
   });
 });

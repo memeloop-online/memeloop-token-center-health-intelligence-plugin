@@ -2,10 +2,10 @@
   "format_version": 1,
   "status": "ready",
   "host_contract_repository": "https://github.com/memeloop-online/memeloop-token-center",
-  "host_contract_revision": "d5598638654fab18b91ae2067b7d5ae11e81ae29",
+  "host_contract_revision": "4c3cb9acb06f86cfdcdfd319b1cfcf1cd924fbdc",
   "installer_repository": "ghcr.io/memeloop-online/memeloop-token-center-plugin-installer",
-  "installer_digest": "sha256:983804095472a068b7a156cd6331e3d4bde8889b7270b622648deeb623117c25",
-  "installer_source_revision": "48465eaf751ef479122ac262806a22ada15c37eb",
+  "installer_digest": "sha256:8fef43792baf12f2d4c547e9f28d26ffa299bf3662723ca44c6610659f82e8bf",
+  "installer_source_revision": "4c3cb9acb06f86cfdcdfd319b1cfcf1cd924fbdc",
   "minimum_installer_contract_revision": "d21f73377f96197fea9f0c34b7a93836458d81af",
   "cosign_version": "v3.1.3-mtc.3"
 }

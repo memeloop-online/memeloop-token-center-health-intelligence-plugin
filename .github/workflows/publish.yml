@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-mtc-health-intelligence
+  group: health-intelligence-pages
   cancel-in-progress: false
 
 jobs:
@@ -15,10 +15,13 @@ jobs:
     if: github.ref == 'refs/heads/master' && github.repository == 'memeloop-online/memeloop-token-center-health-intelligence-plugin'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment:
+      name: github-pages
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
+      pages: write
     env:
       PLUGIN_ID: mtc-health-intelligence
       PLUGIN_SOURCE: ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin
@@ -38,8 +41,8 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Verify and build the package
         run: npm run check
-      - name: Verify the published service-data endpoint
-        run: npm run verify:published
+      - name: Collect the release API snapshot using the built collector
+        run: npm run snapshot
       - name: Resolve reviewed installer trust
         run: |
           node scripts/verify-static.mjs
@@ -64,14 +67,14 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: memeloop-online/memeloop-token-center
-          ref: d5598638654fab18b91ae2067b7d5ae11e81ae29
+          ref: 4c3cb9acb06f86cfdcdfd319b1cfcf1cd924fbdc
           path: mtc-core
           persist-credentials: false
       - name: Check out the pinned installer contract
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: memeloop-online/memeloop-token-center
-          ref: 48465eaf751ef479122ac262806a22ada15c37eb
+          ref: 4c3cb9acb06f86cfdcdfd319b1cfcf1cd924fbdc
           path: mtc-installer-contract
           fetch-depth: 0
           persist-credentials: false
@@ -118,10 +121,11 @@ jobs:
             process.stdin.on("end", () => process.stdout.write(JSON.parse(value).gitVersion));')
           test "$actual_cosign" = "$COSIGN_VERSION"
           echo "$RUNNER_TEMP/plugin-tools" >> "$GITHUB_PATH"
-      - name: Assemble the manifest-only plugin package
+      - name: Assemble the signed component package
         run: |
           mkdir -p "$RUNNER_TEMP/plugin-package"
-          cp plugin.json schemas-health-intelligence.json README.md "$RUNNER_TEMP/plugin-package/"
+          cp plugin.json schemas-health-intelligence.json README.md LICENSE "$RUNNER_TEMP/plugin-package/"
+          cp -R ui "$RUNNER_TEMP/plugin-package/"
           printf '{"format_version":1}\n' > "$RUNNER_TEMP/plugin-package/config.json"
       - name: Publish exact MTC OCI media types
         working-directory: ${{ runner.temp }}/plugin-package
@@ -134,6 +138,8 @@ jobs:
             plugin.json:application/vnd.memeloop.token-center.plugin.manifest.v1+json \
             schemas-health-intelligence.json:application/vnd.memeloop.token-center.plugin.asset.v1 \
             README.md:application/vnd.memeloop.token-center.plugin.asset.v1 \
+            LICENSE:application/vnd.memeloop.token-center.plugin.asset.v1 \
+            ui/health-intelligence.mjs:application/vnd.memeloop.token-center.plugin.asset.v1 \
             --format json > "$RUNNER_TEMP/plugin-push.json"
           digest=$(node -e '
             const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
@@ -179,7 +185,29 @@ jobs:
           cmp "$RUNNER_TEMP/plugin-package/plugin.json" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/plugin.json"
           cmp "$RUNNER_TEMP/plugin-package/schemas-health-intelligence.json" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/schemas-health-intelligence.json"
           cmp "$RUNNER_TEMP/plugin-package/README.md" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/README.md"
+          cmp "$RUNNER_TEMP/plugin-package/ui/health-intelligence.mjs" "$RUNNER_TEMP/plugin-install/$PLUGIN_ID/ui/health-intelligence.mjs"
           node scripts/verify-release.mjs "$RUNNER_TEMP"
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      - name: Upload the release API snapshot
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
+        with:
+          path: site
+      - name: Deploy the release API snapshot
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+      - name: Publish GitHub Release from the verified OCI and Pages inputs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tar -czf "$RUNNER_TEMP/mtc-health-intelligence-$version.tar.gz" -C "$RUNNER_TEMP/plugin-package" .
+          tar -czf "$RUNNER_TEMP/health-intelligence-api-$version.tar.gz" -C site .
+          cd "$RUNNER_TEMP"
+          sha256sum "mtc-health-intelligence-$version.tar.gz" "health-intelligence-api-$version.tar.gz" > SHA256SUMS
+          gh release create "v$version" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Model health & intelligence v$version" --generate-notes \
+            "mtc-health-intelligence-$version.tar.gz" "health-intelligence-api-$version.tar.gz" \
+            SHA256SUMS plugin-release.json plugin-oci-manifest.json plugin-signature-verification.json
       - name: Preserve release and clean-install evidence
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4
         with:
@@ -192,6 +220,8 @@ jobs:
             ${{ runner.temp }}/plugin-package/plugin.json
             ${{ runner.temp }}/plugin-package/schemas-health-intelligence.json
             ${{ runner.temp }}/plugin-package/README.md
+            ${{ runner.temp }}/plugin-package/LICENSE
+            ${{ runner.temp }}/plugin-package/ui/health-intelligence.mjs
             ${{ runner.temp }}/plugin-install/mtc-health-intelligence/.mtc-oci-install.json
           if-no-files-found: error
           retention-days: 90

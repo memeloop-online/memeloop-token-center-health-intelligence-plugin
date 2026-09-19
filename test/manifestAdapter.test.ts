@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   HEALTH_INTELLIGENCE_ENDPOINT_ID,
-  HEALTH_INTELLIGENCE_PRESENTATION,
   HEALTH_INTELLIGENCE_SERVICE_URL,
   ManifestContractError,
   readHealthIntelligenceManifest,
@@ -22,8 +21,9 @@ describe('core contribution adapter', () => {
       route: 'health-intelligence',
       label: '模型健康与能力',
       icon: 'heart',
-      renderer: 'typed_data_v1',
-      presentation: HEALTH_INTELLIGENCE_PRESENTATION,
+      renderer: 'component_v1',
+      moduleEntry: 'ui/health-intelligence.mjs',
+      componentId: 'health-intelligence',
       dataEndpoint: HEALTH_INTELLIGENCE_ENDPOINT_ID,
     });
     expect(result.serviceData).toMatchObject({

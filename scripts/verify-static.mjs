@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (path) => readFileSync(join(root, path), 'utf8');
@@ -11,7 +12,7 @@ const reviewedSchema = json('schemas-health-intelligence.json');
 const installerTrust = json('release/installer-trust.json');
 
 assert.equal(manifest.id, 'mtc-health-intelligence');
-assert.equal(manifest.version, '1.0.1');
+assert.equal(manifest.version, '1.1.0');
 assert.equal(manifest.wit_version, '0.2.0');
 assert.equal(manifest.wasm, null);
 assert.deepEqual(manifest.capabilities, [{
@@ -45,14 +46,15 @@ assert.deepEqual(tab, {
   route: 'health-intelligence',
   label: '模型健康与能力',
   icon: 'heart',
-  renderer: 'typed_data_v1',
-  presentation: 'health_intelligence_v1',
+  renderer: 'component_v1',
+  module_entry: 'ui/health-intelligence.mjs',
+  component_id: 'health-intelligence',
   data_endpoint: 'health-intelligence',
 });
 
 assert.equal(installerTrust.format_version, 1);
 assert.equal(installerTrust.status, 'ready');
-assert.equal(installerTrust.host_contract_revision, 'd5598638654fab18b91ae2067b7d5ae11e81ae29');
+assert.match(installerTrust.host_contract_revision, /^[0-9a-f]{40}$/);
 assert.equal(installerTrust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
 assert.match(installerTrust.installer_digest, /^sha256:[0-9a-f]{64}$/);
 assert.match(installerTrust.installer_source_revision, /^[0-9a-f]{40}$/);
@@ -95,27 +97,45 @@ scan(root);
 
 const coreRoot = process.argv[2];
 if (coreRoot) {
+  assert.equal(execFileSync('git', ['-C', coreRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    installerTrust.host_contract_revision, 'host checkout differs from the reviewed trust revision');
   const coreSchema = JSON.parse(readFileSync(join(coreRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
   const contributions = coreSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned MTC schema lacks service_data');
   assert(contributions?.operator_ui, 'pinned MTC schema lacks operator_ui');
   const operatorUi = readFileSync(join(coreRoot, 'web/src/operator/pluginContributions.tsx'), 'utf8');
-  assert(operatorUi.includes("'health_intelligence_v1'"));
-  assert(operatorUi.includes("new Set(['codexradar', 'deepswe', 'aixhan'])"));
-  assert(operatorUi.includes("renderer === 'typed_data_v1'"));
+  assert(operatorUi.includes("renderer === 'component_v1'"));
+  const sdk = await import(pathToFileURL(join(coreRoot, 'web/operator-ui-sdk/index.js')).href);
+  const module = await import(pathToFileURL(join(root, tab.module_entry)).href);
+  const uiPackage = await module.activateOperatorUi({
+    apiVersion: sdk.OPERATOR_UI_PACKAGE_API_V1,
+    React: {},
+    Fluent: { tokens: {}, makeStyles: () => () => ({}) },
+    defineOperatorUiPackage: sdk.defineOperatorUiPackage,
+  });
+  assert(sdk.operatorUiPackageSupportsManifest(uiPackage, manifest.id, manifest.version),
+    'UI package identity must satisfy the actual pinned host SDK');
+  assert.equal(typeof uiPackage.components[tab.component_id], 'function');
+  assert.equal(module.MAX_SOURCES, reviewedSchema.properties.sources.maxItems);
+  assert.equal(module.MAX_ROWS, reviewedSchema.$defs.source.properties.rows.maxItems);
+  const host = readFileSync(join(coreRoot, 'web/src/plugins/OperatorPluginComponentHost.tsx'), 'utf8');
+  assert(host.includes('loadServiceData(endpointId: string, signal?: AbortSignal)'));
+  assert(host.includes('Fluent: FluentRuntime') && host.includes('React: ReactRuntime'));
 }
 
 const installerRoot = process.argv[3];
 if (installerRoot) {
+  assert.equal(execFileSync('git', ['-C', installerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    installerTrust.installer_source_revision, 'installer checkout differs from the reviewed trust revision');
   const installerManifestSchema = JSON.parse(readFileSync(join(installerRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
   const contributions = installerManifestSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned installer schema lacks service_data');
   assert(contributions?.operator_ui, 'pinned installer schema lacks operator_ui');
-  assert(contributions.operator_ui.items?.properties?.presentation?.enum?.includes('health_intelligence_v1'),
-    'pinned installer schema lacks health_intelligence_v1');
+  assert(contributions.operator_ui.items?.properties?.renderer?.enum?.includes('component_v1'),
+    'pinned installer schema lacks component_v1');
 
   const pluginSource = readFileSync(join(installerRoot, 'src/plugin.rs'), 'utf8');
-  assert(pluginSource.includes('HealthIntelligenceV1'), 'pinned installer runtime lacks health_intelligence_v1');
+  assert(pluginSource.includes('"component_v1"'), 'pinned installer runtime lacks component_v1');
   assert(pluginSource.includes('validate_service_data_contributions(manifest)?'),
     'pinned installer runtime lacks authoritative service_data validation');
 

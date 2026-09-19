@@ -3,7 +3,7 @@
  * payloads never appear in this type (or in an API response).
  */
 
-export type SourceId = 'codexradar' | 'deepswe' | 'aixhan';
+export type SourceId = string;
 export type SourceStatus = 'ok' | 'stale' | 'error';
 
 export interface SourceMeta {
@@ -14,12 +14,12 @@ export interface SourceMeta {
   status: SourceStatus;
   fetchedAt: string;
   sourceUpdatedAt: string | null;
-  ageSeconds: number | null;
+  maxObservationAgeSeconds: number;
   attempts: number;
   error: string | null;
 }
 
-export interface CodexRadarRow {
+export interface CodexRadarRow extends SourceRow {
   key: string;
   model: string;
   effort: string;
@@ -29,7 +29,7 @@ export interface CodexRadarRow {
   samples: number;
 }
 
-export interface DeepSweRow {
+export interface DeepSweRow extends SourceRow {
   key: string;
   model: string;
   effort: string;
@@ -43,7 +43,7 @@ export interface DeepSweRow {
 
 export type AixHanStatus = 'operational' | 'degraded' | 'error' | 'unknown';
 
-export interface AixHanRow {
+export interface AixHanRow extends SourceRow {
   key: string;
   name: string;
   model: string | null;
@@ -70,16 +70,21 @@ export interface AixHanSnapshot extends SourceMeta {
   rows: AixHanRow[];
 }
 
-export type SourceSnapshot = CodexRadarSnapshot | DeepSweSnapshot | AixHanSnapshot;
+export interface SourceRow {
+  key: string;
+  [field: string]: string | number | boolean | null;
+}
+
+export interface SourceSnapshot extends SourceMeta {
+  rows: SourceRow[];
+}
 
 export interface HealthIntelligenceSnapshot {
   schemaVersion: 1;
   generatedAt: string;
-  sources: [CodexRadarSnapshot, DeepSweSnapshot, AixHanSnapshot];
+  sources: SourceSnapshot[];
 }
 
-export const SOURCE_IDS: readonly SourceId[] = ['codexradar', 'deepswe', 'aixhan'];
-
 export function isSourceId(value: string): value is SourceId {
-  return (SOURCE_IDS as readonly string[]).includes(value);
+  return /^[a-z][a-z0-9-]{0,63}$/.test(value);
 }
