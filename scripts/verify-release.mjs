@@ -20,12 +20,14 @@ assert.equal(sha256(ociManifestBytes), expectedDigest);
 const ociManifest = JSON.parse(ociManifestBytes.toString('utf8'));
 assert.equal(ociManifest.artifactType, 'application/vnd.memeloop.token-center.plugin.v1');
 assert.equal(ociManifest.config.mediaType, 'application/vnd.memeloop.token-center.plugin.config.v1+json');
-assert.equal(ociManifest.layers.length, 3);
+assert.equal(ociManifest.layers.length, 5);
 
 const mediaTypes = {
   'plugin.json': 'application/vnd.memeloop.token-center.plugin.manifest.v1+json',
   'schemas-health-intelligence.json': 'application/vnd.memeloop.token-center.plugin.asset.v1',
   'README.md': 'application/vnd.memeloop.token-center.plugin.asset.v1',
+  'LICENSE': 'application/vnd.memeloop.token-center.plugin.asset.v1',
+  'ui/health-intelligence.mjs': 'application/vnd.memeloop.token-center.plugin.asset.v1',
 };
 const files = Object.entries(mediaTypes).map(([name, mediaType]) => {
   const bytes = read(`plugin-package/${name}`);
@@ -40,7 +42,8 @@ const files = Object.entries(mediaTypes).map(([name, mediaType]) => {
 const packageManifest = json('plugin-package/plugin.json');
 assert.equal(packageManifest.id, 'mtc-health-intelligence');
 assert.equal(packageManifest.wasm, null);
-assert.equal(packageManifest.contributions.operator_ui[0].presentation, 'health_intelligence_v1');
+assert.equal(packageManifest.contributions.operator_ui[0].renderer, 'component_v1');
+assert.equal(packageManifest.contributions.operator_ui[0].module_entry, 'ui/health-intelligence.mjs');
 assert.equal(packageManifest.contributions.service_data[0].id, 'health-intelligence');
 
 const installed = json('plugin-installation.json');
@@ -83,4 +86,4 @@ const evidence = {
   manifest_verified_by: 'MTC official install-plugin-oci',
 };
 writeFileSync(join(evidenceRoot, 'plugin-release.json'), `${JSON.stringify(evidence, null, 2)}\n`);
-console.log('manifest-only release evidence verified');
+console.log('signed component release evidence verified');

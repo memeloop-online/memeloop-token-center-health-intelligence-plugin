@@ -14,13 +14,13 @@ export function fixtureText(name: string): string {
 }
 
 export function fixtureFetch(
-  bodies: Partial<Record<'codexradar' | 'deepswe' | 'aixhan', unknown>> = {
+  bodies: Partial<Record<string, unknown>> = {
     codexradar: fixture('codexradar.json'),
     deepswe: fixture('deepswe.json'),
     aixhan: fixture('aixhan.json'),
   },
   robots = fixtureText('robots/allow-all.txt'),
-  statuses: Partial<Record<'codexradar' | 'deepswe' | 'aixhan', number>> = {},
+  statuses: Partial<Record<string, number>> = {},
 ): { fetch: FetchLike; calls: string[] } {
   const calls: string[] = [];
   const fetcher: FetchLike = async (input) => {
@@ -36,4 +36,4 @@ export function fixtureFetch(
   return { fetch: fetcher, calls };
 }
 
-export const fixedNow = () => new Date('2026-09-07T16:00:00.000Z');
+export const fixedNow = () => new Date('2026-09-07T07:44:00.000Z');

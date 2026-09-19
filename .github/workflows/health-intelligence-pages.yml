@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: health-intelligence-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:

@@ -6,8 +6,8 @@ import type {
   SourceId,
   SourceSnapshot,
 } from '../shared/types.js';
-import { SOURCE_IDS } from '../shared/types.js';
-import { sourceSpec } from './sources.js';
+import { isSourceId, type SourceRow } from '../shared/types.js';
+import { refreshSourceStatus } from '../shared/freshness.js';
 
 export class SnapshotDecodeError extends Error {
   constructor() {
@@ -48,17 +48,24 @@ function date(value: unknown): value is string {
 }
 
 function sourceMeta(value: Record<string, unknown>, id: SourceId): boolean {
-  const spec = sourceSpec(id);
   return value.id === id
     && text(value.label, 120)
-    && value.pageUrl === spec.pageUrl
-    && value.endpoint === spec.endpoint
+    && publicUrl(value.pageUrl)
+    && publicUrl(value.endpoint)
     && (value.status === 'ok' || value.status === 'stale' || value.status === 'error')
     && date(value.fetchedAt)
     && (value.sourceUpdatedAt === null || date(value.sourceUpdatedAt))
-    && nullableNumber(value.ageSeconds)
+    && boundedNumber(value.maxObservationAgeSeconds, 1, Number.MAX_SAFE_INTEGER)
     && number(value.attempts) && Number.isInteger(value.attempts) && boundedNumber(value.attempts, 0, 12)
     && nullableText(value.error, 256);
+}
+
+function publicUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.username === '' && url.password === '';
+  } catch { return false; }
 }
 
 function codexRadarRow(value: unknown): CodexRadarRow | null {
@@ -95,26 +102,40 @@ function aixHanRow(value: unknown): AixHanRow | null {
   return row as unknown as AixHanRow;
 }
 
-function source(value: unknown, id: SourceId): SourceSnapshot | null {
+const rowDecoders: Record<string, (value: unknown) => SourceRow | null> = {
+  codexradar: codexRadarRow, deepswe: deepSweRow, aixhan: aixHanRow,
+};
+
+function scalarRow(value: unknown): SourceRow | null {
+  const row = record(value);
+  if (!row || !text(row.key, 180) || Object.keys(row).length > 32) return null;
+  if (!Object.values(row).every((cell) => cell === null || typeof cell === 'boolean'
+    || number(cell) || (typeof cell === 'string' && cell.length <= 256))) return null;
+  return row as SourceRow;
+}
+
+function source(value: unknown): SourceSnapshot | null {
   const candidate = record(value);
-  if (!candidate || !sourceMeta(candidate, id) || !Array.isArray(candidate.rows) || candidate.rows.length > 24) return null;
-  const rows = candidate.rows.map((row) => id === 'codexradar'
-    ? codexRadarRow(row)
-    : id === 'deepswe' ? deepSweRow(row) : aixHanRow(row));
+  if (!candidate || typeof candidate.id !== 'string' || !isSourceId(candidate.id)
+    || !sourceMeta(candidate, candidate.id) || !Array.isArray(candidate.rows) || candidate.rows.length > 24) return null;
+  const id = candidate.id;
+  const decode = Object.hasOwn(rowDecoders, id) ? rowDecoders[id]! : scalarRow;
+  const rows = candidate.rows.map(decode);
   if (rows.some((row) => row === null)) return null;
   return { ...candidate, id, rows } as unknown as SourceSnapshot;
 }
 
-export function decodeSnapshot(value: unknown): HealthIntelligenceSnapshot {
+export function decodeSnapshot(value: unknown, now = Date.now()): HealthIntelligenceSnapshot {
   const root = record(value);
   const rawSources = root?.sources;
   if (!root || root.schemaVersion !== 1 || !date(root.generatedAt)
-    || !Array.isArray(rawSources) || rawSources.length !== SOURCE_IDS.length) throw new SnapshotDecodeError();
-  const sources = SOURCE_IDS.map((id, index) => source(rawSources[index], id));
+    || !Array.isArray(rawSources)) throw new SnapshotDecodeError();
+  const sources = rawSources.map(source);
   if (sources.some((entry) => entry === null)) throw new SnapshotDecodeError();
+  if (new Set(sources.map((entry) => entry!.id)).size !== sources.length) throw new SnapshotDecodeError();
   return {
     schemaVersion: 1,
     generatedAt: root.generatedAt,
-    sources: sources as HealthIntelligenceSnapshot['sources'],
+    sources: sources.map((entry) => refreshSourceStatus(entry!, now)),
   };
 }

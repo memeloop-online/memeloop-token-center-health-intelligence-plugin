@@ -1,25 +1,17 @@
 import type {
-  AixHanRow,
-  CodexRadarRow,
-  DeepSweRow,
   HealthIntelligenceSnapshot,
   SourceId,
   SourceSnapshot,
 } from '../shared/types.js';
-import { SOURCE_IDS } from '../shared/types.js';
-import {
-  InvalidPayloadError,
-  normalizeAixHan,
-  normalizeCodexRadar,
-  normalizeDeepSwe,
-} from './normalizers.js';
+import { InvalidPayloadError } from './normalizers.js';
+import { refreshSourceStatus } from '../shared/freshness.js';
 import {
   assertExactAllowedOrigin,
   parseRobots,
   robotsUnavailable,
   type RobotsRules,
 } from './security.js';
-import { sourceSpec, type SourceSpec } from './sources.js';
+import { createSourceRegistry, SOURCE_REGISTRY, type SourceSpec } from './sources.js';
 
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -73,6 +65,7 @@ export interface SnapshotServiceOptions {
   readonly policy?: Partial<FetchPolicy>;
   readonly cacheTtlMs?: number;
   readonly initialSnapshot?: HealthIntelligenceSnapshot;
+  readonly sources?: readonly SourceSpec[];
 }
 
 interface ResolvedSnapshotOptions {
@@ -81,6 +74,7 @@ interface ResolvedSnapshotOptions {
   readonly sleep: (milliseconds: number) => Promise<void>;
   readonly policy: FetchPolicy;
   readonly cacheTtlMs: number;
+  readonly allowedOrigins: ReadonlySet<string>;
 }
 
 interface CachedSource {
@@ -185,7 +179,7 @@ async function fetchResponse(
   capBytes: number,
   acceptedContentType: 'json' | 'robots',
 ): Promise<{ response: Response; body: string; attempts: number }> {
-  assertExactAllowedOrigin(url);
+  assertExactAllowedOrigin(url, options.allowedOrigins);
   let lastError: SourceFetchError | undefined;
   for (let attempt = 0; attempt <= options.policy.retries; attempt += 1) {
     const controller = new AbortController();
@@ -290,17 +284,6 @@ async function fetchRobots(
   }
 }
 
-function sourceRows(source: SourceId, body: unknown): { sourceUpdatedAt: string | null; rows: SourceSnapshot['rows'] } {
-  switch (source) {
-    case 'codexradar':
-      return normalizeCodexRadar(body);
-    case 'deepswe':
-      return normalizeDeepSwe(body);
-    case 'aixhan':
-      return normalizeAixHan(body);
-  }
-}
-
 function publicError(error: unknown): { code: FetchFailureCode; message: string } {
   if (error instanceof SourceFetchError) {
     return { code: error.code, message: error.message };
@@ -318,13 +301,8 @@ function optionsFor(input: SnapshotServiceOptions): ResolvedSnapshotOptions {
     sleep: input.sleep ?? defaultSleep,
     policy: mergePolicy(input.policy),
     cacheTtlMs: input.cacheTtlMs ?? 5 * 60_000,
+    allowedOrigins: new Set((input.sources ?? [...SOURCE_REGISTRY.values()]).map((spec) => new URL(spec.endpoint).origin)),
   };
-}
-
-function ageSeconds(fetchedAt: string, now: Date): number | null {
-  const timestamp = Date.parse(fetchedAt);
-  if (!Number.isFinite(timestamp)) return null;
-  return Math.max(0, Math.floor((now.getTime() - timestamp) / 1_000));
 }
 
 function sourceSnapshot(
@@ -345,24 +323,22 @@ function sourceSnapshot(
     status: sourceStatus,
     fetchedAt,
     sourceUpdatedAt,
-    ageSeconds: ageSeconds(fetchedAt, now),
+    maxObservationAgeSeconds: spec.maxObservationAgeSeconds,
     attempts,
     error,
   };
-  switch (spec.source) {
-    case 'codexradar': return { ...meta, id: 'codexradar', rows: rows as CodexRadarRow[] };
-    case 'deepswe': return { ...meta, id: 'deepswe', rows: rows as DeepSweRow[] };
-    case 'aixhan': return { ...meta, id: 'aixhan', rows: rows as AixHanRow[] };
-  }
+  return refreshSourceStatus({ ...meta, rows }, now.getTime());
 }
 
 export class SnapshotService {
   private readonly options: ResolvedSnapshotOptions;
+  private readonly sources: ReadonlyMap<SourceId, SourceSpec>;
   private readonly cache = new Map<SourceId, CachedSource>();
   private inFlight: Promise<HealthIntelligenceSnapshot> | null = null;
 
   constructor(options: SnapshotServiceOptions = {}) {
     this.options = optionsFor(options);
+    this.sources = options.sources ? createSourceRegistry(options.sources) : SOURCE_REGISTRY;
     if (!Number.isInteger(this.options.cacheTtlMs) || this.options.cacheTtlMs < 0 || this.options.cacheTtlMs > 60 * 60_000) {
       throw new Error('cacheTtlMs is outside the safe range');
     }
@@ -389,21 +365,16 @@ export class SnapshotService {
 
   private async readSources(force: boolean): Promise<HealthIntelligenceSnapshot> {
     const now = this.options.now();
-    const values = await Promise.all(SOURCE_IDS.map((id) => this.readSource(id, now, force)));
-    const byId = new Map(values.map((value) => [value.id, value]));
+    const values = await Promise.all([...this.sources.values()].map((spec) => this.readSource(spec, now, force)));
     return {
       schemaVersion: 1,
       generatedAt: now.toISOString(),
-      sources: [
-        byId.get('codexradar') as Extract<SourceSnapshot, { id: 'codexradar' }>,
-        byId.get('deepswe') as Extract<SourceSnapshot, { id: 'deepswe' }>,
-        byId.get('aixhan') as Extract<SourceSnapshot, { id: 'aixhan' }>,
-      ],
+      sources: values,
     };
   }
 
-  private async readSource(id: SourceId, now: Date, force: boolean): Promise<SourceSnapshot> {
-    const spec = sourceSpec(id);
+  private async readSource(spec: SourceSpec, now: Date, force: boolean): Promise<SourceSnapshot> {
+    const id = spec.source;
     const cached = this.cache.get(id);
     if (!force && cached && now.getTime() - Date.parse(cached.fetchedAt) < this.options.cacheTtlMs) {
       return sourceSnapshot(spec, 'ok', cached.fetchedAt, cached.sourceUpdatedAt, cached.rows, 0, null, now);
@@ -420,8 +391,8 @@ export class SnapshotService {
       }
       const result = await fetchJson(spec.endpoint, this.options);
       attempts += result.attempts;
-      const normalized = sourceRows(id, result.body);
-      const fetchedAt = now.toISOString();
+      const normalized = spec.normalize(result.body);
+      const fetchedAt = this.options.now().toISOString();
       this.cache.set(id, {
         sourceUpdatedAt: normalized.sourceUpdatedAt,
         fetchedAt,

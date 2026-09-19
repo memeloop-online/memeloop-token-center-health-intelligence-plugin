@@ -1,10 +1,8 @@
 /**
- * Adapter for the current MTC operator contribution contract. The core owns the renderer and
- * calls the named service-data endpoint; this package never asks the browser
- * to load a plugin script, document, stylesheet, or iframe.
+ * Adapter for the signed MTC component package and declared service-data feed.
  */
 
-export const CORE_UI_CONTRACT = 'typed_data_v1';
+export const CORE_UI_CONTRACT = 'component_v1';
 export const HEALTH_INTELLIGENCE_PRESENTATION = 'health_intelligence_v1';
 export const HEALTH_INTELLIGENCE_PLUGIN_ID = 'mtc-health-intelligence';
 export const HEALTH_INTELLIGENCE_TAB_ID = 'health-and-intelligence';
@@ -29,8 +27,9 @@ export interface HealthIntelligenceTabContribution {
   readonly route: 'health-intelligence';
   readonly label: '模型健康与能力';
   readonly icon: 'heart';
-  readonly renderer: 'typed_data_v1';
-  readonly presentation: typeof HEALTH_INTELLIGENCE_PRESENTATION;
+  readonly renderer: 'component_v1';
+  readonly moduleEntry: 'ui/health-intelligence.mjs';
+  readonly componentId: 'health-intelligence';
   readonly dataEndpoint: typeof HEALTH_INTELLIGENCE_ENDPOINT_ID;
 }
 
@@ -122,7 +121,8 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     || candidate.label !== '模型健康与能力'
     || candidate.icon !== 'heart'
     || candidate.renderer !== CORE_UI_CONTRACT
-    || candidate.presentation !== HEALTH_INTELLIGENCE_PRESENTATION
+    || candidate.module_entry !== 'ui/health-intelligence.mjs'
+    || candidate.component_id !== 'health-intelligence'
     || candidate.data_endpoint !== HEALTH_INTELLIGENCE_ENDPOINT_ID
     || Object.prototype.hasOwnProperty.call(candidate, 'entry')
     || Object.prototype.hasOwnProperty.call(candidate, 'remote_content')) {
@@ -135,8 +135,9 @@ function tab(value: unknown): HealthIntelligenceTabContribution {
     route: 'health-intelligence',
     label: '模型健康与能力',
     icon: 'heart',
-    renderer: 'typed_data_v1',
-    presentation: HEALTH_INTELLIGENCE_PRESENTATION,
+    renderer: 'component_v1',
+    moduleEntry: 'ui/health-intelligence.mjs',
+    componentId: 'health-intelligence',
     dataEndpoint: HEALTH_INTELLIGENCE_ENDPOINT_ID,
   };
 }

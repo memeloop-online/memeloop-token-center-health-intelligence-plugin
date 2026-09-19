@@ -1,103 +1,35 @@
-# MTC 模型健康与能力
+# MTC Model Health & Intelligence
 
-`mtc-health-intelligence` 是 MemeLoop Token Center 的官方 TypeScript 插件示例。安装后，它在 Operator 的“监控”分类注册“模型健康与能力”页签，将三个公开来源汇总为一个类型化数据视图：
+[中文](docs/zh-CN/README.md)
 
-- [Codex Radar](https://codexradar.com/)：综合 IQ 与样本量。
-- [DeepSWE](https://deepswe.datacurve.ai/)：软件工程任务通过率与 Agent 步数。
-- [CDK 模型健康](https://cdk.aixhan.com/model-health)：模型服务状态、响应延迟与最近检查时间。
+A signed MemeLoop Token Center plugin that brings public model health and benchmark feeds into the Operator's Monitoring section.
 
-浏览器通过 MTC 的插件数据端点读取规范化 JSON。`typed_data_v1` 与 `health_intelligence_v1` 由 MTC 核心渲染，自动沿用 Operator 的布局、状态、排版、主题和响应式设计。插件安装后由运行时清单注册页签，无需重新构建 MTC Web。
+The included sources are [Codex Radar](https://codexradar.com/), [DeepSWE](https://deepswe.datacurve.ai/), and [CDK Model Health](https://cdk.aixhan.com/model-health). Each source shows its observation time, collection time, status, and normalized results.
 
-## 数据流
+## Install
 
-```text
-公开 JSON 来源
-  -> 固定 HTTPS 来源与路径校验
-  -> 超时、重试、响应体上限、缓存
-  -> TypeScript 规范化与字段裁剪
-  -> /api/health-intelligence 类型化快照
-  -> MTC service_data 代理
-  -> Operator“模型健康与能力”页签
-```
+Use the OCI reference from the [latest GitHub Release](https://github.com/memeloop-online/memeloop-token-center-health-intelligence-plugin/releases). MTC's official installer verifies its signature and installs the UI module and manifest together. The `component_v1` interface uses the host's React, Fluent components, and theme tokens. Chinese and English follow the operator locale.
 
-根目录的 [`plugin.json`](plugin.json) 使用当前 MTC 清单契约：
+Requires MTC's signed `component_v1` runtime. The exact tested host and installer are listed in [release/installer-trust.json](release/installer-trust.json).
 
-- 插件 ID：`mtc-health-intelligence`
-- 数据贡献：`contributions.service_data[0]`
-- Operator 贡献：`contributions.operator_ui[0]`
-- 分类：`monitoring`
-- 路由：`health-intelligence`
-- 渲染器：`typed_data_v1`
-- 呈现：`health_intelligence_v1`
-- 权限：`metrics:read`
+## Data API
 
-清单中的服务地址为：
+[Public snapshot](https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json) · [JSON Schema](schemas-health-intelligence.json)
 
-```text
-https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json
-```
+Pages collects public JSON feeds every ten minutes. Each snapshot contains an open `sources` list. Source entries have `id`, `label`, `pageUrl`, `endpoint`, `fetchedAt`, `sourceUpdatedAt`, `maxObservationAgeSeconds`, `status`, and flat scalar `rows`.
 
-GitHub Pages 工作流每十分钟生成一次快照。单个来源短暂失败时沿用上一版规范化记录并标记为 `stale`，其余来源继续更新；首次采集失败的来源标记为 `error`。
+The view calculates freshness from absolute timestamps every thirty seconds. Fetches older than twenty minutes appear as stale; each source also defines its observation lifetime. Collection failures retain the last successful records with a stale status.
 
-仓库管理员首次发布前在 Pages 设置中选择 **GitHub Actions** 作为发布源。合并到 `master` 后，`publish health intelligence API` 工作流会更新上述地址。
+## Add a source
 
-## 安装
+Add one definition to [src/server/sources.ts](src/server/sources.ts): a stable ID, label, HTTPS page/data/robots URLs, observation lifetime, and normalizer. `createSourceRegistry` validates unique IDs and matching origins. Custom deployments can pass a source list to `SnapshotService`.
 
-手动 `publish plugin` 工作流发布 manifest-only 的签名 OCI 插件包：
+The schema and UI accept new source IDs and flat scalar row fields. Existing benchmark fields have localized labels and number formats; additional fields display their declared names. Supply focused payload fixtures alongside a new normalizer.
 
-```text
-ghcr.io/memeloop-online/memeloop-token-center-health-intelligence-plugin@sha256:<published-digest>
-```
+## Run and publish
 
-发布前工作流会验证 Pages API、当前 MTC 清单契约和固定安装器信任；发布后使用官方 `install-plugin-oci` 对签名字节执行干净重装。安装并刷新插件清单后，“模型健康与能力”会出现在 Operator 的“监控”分类。
+CI installs the lockfile and runs type checking, fixture tests, and the collector build. The `publish plugin` workflow builds once, collects the Pages snapshot, signs the OCI package, and verifies an installation with the official MTC installer. GitHub Release archives reuse those package and snapshot bytes and include checksums and signature evidence.
 
-## API 契约
+The same collector supports a Node service through `npm run serve`, exposing `GET /api/health-intelligence`. Source fetches have a four-second timeout, two retries, and a five-minute memory cache.
 
-响应结构由 [`schemas-health-intelligence.json`](schemas-health-intelligence.json) 定义：
-
-```json
-{
-  "schemaVersion": 1,
-  "generatedAt": "2026-09-18T11:00:00.000Z",
-  "sources": [
-    { "id": "codexradar", "status": "ok", "rows": [] },
-    { "id": "deepswe", "status": "ok", "rows": [] },
-    { "id": "aixhan", "status": "ok", "rows": [] }
-  ]
-}
-```
-
-每个来源包含固定的 `pageUrl` 与 `endpoint`、采集时间、来源更新时间、状态、尝试次数和最多 24 条规范化记录。快照只保留供 Operator 展示的规范化字段。
-
-服务也可以作为常驻 Node 进程运行：
-
-```text
-npm ci --ignore-scripts
-npm run build
-PORT=8080 npm run serve
-```
-
-常驻服务提供 `GET /api/health-intelligence`。同一 `SnapshotService` 同时用于常驻服务与 Pages 快照，因此两种部署方式共享来源约束和类型化输出。
-
-## 边界
-
-来源列表位于 [`src/server/sources.ts`](src/server/sources.ts)，请求前由 [`src/server/security.ts`](src/server/security.ts) 校验：
-
-- 三个已审查的 HTTPS origin 与固定路径构成来源清单。
-- 请求采用固定 User-Agent、无浏览器会话的公开读取方式，并直接读取来源端点。
-- 单次请求超时 4 秒，瞬态失败最多重试两次。
-- JSON 响应上限为 2 MiB，`robots.txt` 上限为 64 KiB。
-- 内存缓存有效期为 5 分钟；刷新失败时可返回上一次规范化数据并标记为 `stale`。
-- Operator 接收稳定的错误分类，便于展示和筛选。
-
-## 开发与验证
-
-CI 使用 Node 24，执行：
-
-```text
-npm ci --ignore-scripts
-npm run check
-node scripts/verify-static.mjs <pinned-mtc-source> <pinned-installer-source>
-```
-
-单元测试只读取 `test/fixtures`。清单校验固定到 MTC `d5598638654fab18b91ae2067b7d5ae11e81ae29`，发布校验同时读取签名安装器对应的源码契约，覆盖 `service_data`、运行时 Operator 页签注册、`typed_data_v1`、`health_intelligence_v1` 与服务数据 JSON Schema 子集。真实来源采集仅在 Pages 发布工作流执行。
+Licensed under [Apache License 2.0](LICENSE).

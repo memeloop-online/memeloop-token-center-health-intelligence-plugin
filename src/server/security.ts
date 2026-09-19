@@ -19,9 +19,9 @@ export class PublicBoundaryError extends Error {
  * Validate an origin at the last possible moment before a request.  The
  * caller must still compare the path with its source's fixed endpoint.  This
  * deliberately rejects credentials, query strings, fragments, non-HTTPS
- * schemes, and any origin outside the three reviewed public sites.
+ * schemes, and origins outside the active source registry.
  */
-export function assertExactAllowedOrigin(rawUrl: string): URL {
+export function assertExactAllowedOrigin(rawUrl: string, allowedOrigins = EXACT_ALLOWED_ORIGINS): URL {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -37,7 +37,7 @@ export function assertExactAllowedOrigin(rawUrl: string): URL {
   if (url.search !== '') {
     throw new PublicBoundaryError('endpoint must not contain a query string');
   }
-  if (!EXACT_ALLOWED_ORIGINS.has(url.origin)) {
+  if (!allowedOrigins.has(url.origin)) {
     throw new PublicBoundaryError('endpoint origin is not in the exact public allowlist');
   }
   return url;
@@ -50,10 +50,10 @@ export interface FixedEndpoint {
   readonly robotsUrl: string;
 }
 
-export function assertFixedEndpoint(endpoint: FixedEndpoint): URL {
-  const page = assertExactAllowedOrigin(endpoint.pageUrl);
-  const data = assertExactAllowedOrigin(endpoint.endpoint);
-  const robots = assertExactAllowedOrigin(endpoint.robotsUrl);
+export function assertFixedEndpoint(endpoint: FixedEndpoint, allowedOrigins = EXACT_ALLOWED_ORIGINS): URL {
+  const page = assertExactAllowedOrigin(endpoint.pageUrl, allowedOrigins);
+  const data = assertExactAllowedOrigin(endpoint.endpoint, allowedOrigins);
+  const robots = assertExactAllowedOrigin(endpoint.robotsUrl, allowedOrigins);
   const expectedOrigin = page.origin;
   if (data.origin !== expectedOrigin || robots.origin !== expectedOrigin) {
     throw new PublicBoundaryError('source page, endpoint, and robots URL must share an exact origin');

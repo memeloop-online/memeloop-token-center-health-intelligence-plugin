@@ -1,13 +1,14 @@
 {
   "name": "@memeloop/mtc-health-intelligence",
-  "version": "1.0.1",
-  "description": "Official MTC health and intelligence plugin with a typed three-source public API",
+  "version": "1.1.0",
+  "description": "MTC model health and intelligence: extensible public feeds and signed operator UI",
   "type": "module",
   "engines": {
     "node": ">=22.0.0 <25"
   },
   "files": [
     "dist/server",
+    "ui",
     "plugin.json",
     "schemas-health-intelligence.json",
     "README.md",
