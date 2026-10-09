@@ -45,6 +45,14 @@ The UI verifies plugin/endpoint provenance and propagates host stale/unavailable
 state even if embedded records say `ok`. Refresh reads cache; it does not execute
 collection, bypass backoff or refresh successful collection timestamps.
 
+The pinned host `4c3cb9acb06f86cfdcdfd319b1cfcf1cd924fbdc` omits
+`provenance.freshness`. Its `partial`, `source` and millisecond `fetched_at`
+fields remain supported: network/cache success displays its records, partial or
+stale-cache results retain records as stale, and manifest fallback is unavailable.
+Legacy collection times older than twenty minutes or beyond the existing clock
+skew allowance downgrade to stale. Explicit modern freshness takes precedence
+over this legacy inference; identity checks apply to both response shapes.
+
 ## Existing ABI and remaining integration
 
 The host already supports `memeloop:token-center@0.2.0`, world
