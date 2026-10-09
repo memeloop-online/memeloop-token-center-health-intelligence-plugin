@@ -16,13 +16,15 @@ Requires MTC's signed `component_v1` runtime. The exact tested host and installe
 
 [Public snapshot](https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json) · [JSON Schema](schemas-health-intelligence.json)
 
-Pages collects public JSON feeds every ten minutes. Each snapshot contains an open `sources` list. Source entries have `id`, `label`, `pageUrl`, `endpoint`, `fetchedAt`, `sourceUpdatedAt`, `maxObservationAgeSeconds`, `status`, and flat scalar `rows`.
+The installed component collects the three approved public JSON feeds through the MTC worker and host HTTP capability. Pages also publishes a reference snapshot every ten minutes. Each snapshot contains an open `sources` list. Source entries have `id`, `label`, `pageUrl`, `endpoint`, `fetchedAt`, `sourceUpdatedAt`, `maxObservationAgeSeconds`, `status`, and flat scalar `rows`.
 
 The view calculates freshness from absolute timestamps every thirty seconds. Fetches older than twenty minutes appear as stale; each source also defines its observation lifetime. Collection failures retain the last successful records with a stale status.
 
 ## Add a source
 
-Add one definition to [src/server/sources.ts](src/server/sources.ts): a stable ID, label, HTTPS page/data/robots URLs, observation lifetime, and normalizer. `createSourceRegistry` validates unique IDs and matching origins. Custom deployments can pass a source list to `SnapshotService`.
+For the Node reference, add one definition to [src/server/sources.ts](src/server/sources.ts): a stable ID, label, HTTPS page/data/robots URLs, observation lifetime, and normalizer. `createSourceRegistry` validates unique IDs and matching origins. Custom deployments can pass a source list to `SnapshotService`.
+
+The installed component accepts only the exact signed three-source configuration in `component/sources.json`. Adding a runtime source requires updating its approved configuration, Rust normalizer, manifest capability and fixtures, then building and signing a new release.
 
 The schema and UI accept new source IDs and flat scalar row fields. Existing benchmark fields have localized labels and number formats; additional fields display their declared names. Supply focused payload fixtures alongside a new normalizer.
 
@@ -30,9 +32,9 @@ The schema and UI accept new source IDs and flat scalar row fields. Existing ben
 
 The [service-data runtime contract](docs/service-data-runtime.md) describes the
 configuration-driven collector API, authority boundary, failure cache and the
-remaining component integration. The installed release still uses Pages.
+actual WIT component, signed source configuration, host deadline and durable cache.
 
-CI installs the lockfile and runs type checking, fixture tests, and the collector build. The `publish plugin` workflow builds once, collects the Pages snapshot, signs the OCI package, and verifies an installation with the official MTC installer. GitHub Release archives reuse those package and snapshot bytes and include checksums and signature evidence.
+CI installs the npm lockfile, runs type checking and fixture tests, builds the Wasm component, executes collect/normalize in Wasmtime, and checks fixture parity and the exact pinned host WIT. The `publish plugin` workflow builds the actual component, collects a separate Pages reference snapshot, signs the OCI package containing `plugin.wasm`, and verifies an installation with the official MTC installer. GitHub Release archives reuse those package and snapshot bytes and include checksums and signature evidence.
 
 The same collector supports a Node service through `npm run serve`, exposing `GET /api/health-intelligence`. Source fetches have a four-second timeout, two retries, and a five-minute memory cache.
 

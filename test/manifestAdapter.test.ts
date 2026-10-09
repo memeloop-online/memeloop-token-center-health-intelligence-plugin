@@ -28,7 +28,7 @@ describe('core contribution adapter', () => {
     });
     expect(result.serviceData).toMatchObject({
       id: HEALTH_INTELLIGENCE_ENDPOINT_ID,
-      url: HEALTH_INTELLIGENCE_SERVICE_URL,
+      componentAdapter: { api_version: 'component-v1', collector: 'health-three-source-v1', normalizer: 'health-snapshot-v1' },
       requiredScope: 'metrics:read',
       cacheTtlSeconds: 300,
       timeoutMillis: 4000,

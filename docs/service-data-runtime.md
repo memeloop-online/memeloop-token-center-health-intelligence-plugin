@@ -1,8 +1,9 @@
 # Health service-data runtime contract
 
-The current release still declares the Pages HTTP snapshot. This reference API
-prepares component collection; it does not publish a Wasm collector or switch
-the installed manifest.
+The 1.2.0 manifest selects the real Rust Wasm component in `component/` through
+`component_adapter`. The Node runtime remains a reference implementation and
+Pages remains a separate public snapshot. The installed UI reads the host
+service-data envelope.
 
 ## Configuration and authority
 
@@ -53,21 +54,48 @@ Legacy collection times older than twenty minutes or beyond the existing clock
 skew allowance downgrade to stale. Explicit modern freshness takes precedence
 over this legacy inference; identity checks apply to both response shapes.
 
-## Existing ABI and remaining integration
+## Component ABI and release boundaries
 
 The host already supports `memeloop:token-center@0.2.0`, world
 `service-data-plugin`, with `service-data-v1.collect(collector-id, config-json)`
 and `normalize(normalizer-id, config-json, collected-json)`. Manifest endpoint
-`component` selects collector/normalizer/config. Host HTTP returns an envelope
+`component_adapter` selects collector/normalizer/config. Host HTTP returns an envelope
 with status, headers and `body_base64`. Collect and normalize share one host
 execution deadline and body cap. No additional host API or SDK major is needed.
 
-The current Operator SDK exposes cache reads/navigation. It cannot run this
-TypeScript collector in the worker or authorize arbitrary external fetches.
-Remaining plugin work: compile an existing-WIT component, decode host transport
-envelopes, and switch the signed manifest to component collection with approved
-origins. The total budget must include robots, data and normalization; Node's
-per-request timeout does not establish that budget. Existing CI checks this
-reference contract/UI, not component execution, signed runtime installation,
-pre-release acceptance or production readiness. Keep the signed installation
-unchanged until those separate checks pass.
+The component accepts only the exact approved configuration in
+`component/sources.json`, also embedded in the signed manifest. HTTP uses fixed
+public GET headers and no automatic retries. Robots and data requests for all
+three sources and normalization share the host execution deadline; endpoint
+`timeout_millis` is 4000, further bounded by the host execution timeout. A failed
+request or normalization returns a sanitized component error; the host retains
+its durable last-good endpoint snapshot and emits failure provenance. Unlike
+the Node reference's per-source memory cache, this is whole-endpoint failure
+handling: one failed source can leave all three sources stale.
+
+The WIT has no clock import. The component requires a valid upstream HTTP Date
+for each successful data response and uses it for embedded `fetchedAt`; the
+host envelope's `fetched_at` remains the authoritative collection time. Missing
+Date fails closed. Upstream Date is not proof of local completion time. The UI
+continues to evaluate source observation age and host freshness separately.
+
+The existing verify workflow builds the actual component, executes it in
+Wasmtime with the host's 5,000,000 fuel, 32 MiB memory and a shared 4000 ms
+epoch/HTTP deadline. Scenarios cover mixed-offset latest-observation ordering,
+robots denial with zero data calls, malformed base64, missing Date, HTML, HTTP
+status and redacted transport failures. CI compares normalized rows with the Node
+reference, and checks WIT equality against the pinned host. The exact manifest, fallback
+and component output are checked against authoritative host/installer schemas
+using their pinned JSON Schema engine. These schema checks are not an official
+signed-install receipt. Installer trust pins verified master artifact run
+37914361285, source b1b0a01d2adcae6f94d7c51a228ff249a65cfdd3. The publish
+workflow packages those Wasm bytes, signs the exact OCI digest, and reinstalls
+with the official pinned installer on a GitHub Actions runner. Component build
+and release evidence include the Wasm digest. No local build/install is needed.
+
+A PR CI artifact is an unsigned review package. Signed publication requires the
+existing master-only publish workflow after reviewed merge. That gate is not
+executed by this PR. Fixture execution is not live three-source acceptance or
+proof that all six HTTP requests fit the configured host deadline. Exact signed
+artifact installation, live source collection, deadline suitability and cache
+failure/recovery verification remain preproduction acceptance boundaries.

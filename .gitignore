@@ -6,3 +6,9 @@ coverage/
 .env.*
 !.env.example
 *.log
+
+/target/
+/plugin.wasm
+/component-snapshot.json
+/component-build.json
+/component-bounds.json

@@ -1,0 +1,3 @@
+[workspace]
+members = ["component", "componentize", "host-harness"]
+resolver = "2"

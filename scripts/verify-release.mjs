@@ -20,9 +20,10 @@ assert.equal(sha256(ociManifestBytes), expectedDigest);
 const ociManifest = JSON.parse(ociManifestBytes.toString('utf8'));
 assert.equal(ociManifest.artifactType, 'application/vnd.memeloop.token-center.plugin.v1');
 assert.equal(ociManifest.config.mediaType, 'application/vnd.memeloop.token-center.plugin.config.v1+json');
-assert.equal(ociManifest.layers.length, 5);
+assert.equal(ociManifest.layers.length, 6);
 
 const mediaTypes = {
+  'plugin.wasm': 'application/vnd.wasm.content.layer.v1+wasm',
   'plugin.json': 'application/vnd.memeloop.token-center.plugin.manifest.v1+json',
   'schemas-health-intelligence.json': 'application/vnd.memeloop.token-center.plugin.asset.v1',
   'README.md': 'application/vnd.memeloop.token-center.plugin.asset.v1',
@@ -41,7 +42,7 @@ const files = Object.entries(mediaTypes).map(([name, mediaType]) => {
 
 const packageManifest = json('plugin-package/plugin.json');
 assert.equal(packageManifest.id, 'mtc-health-intelligence');
-assert.equal(packageManifest.wasm, null);
+assert.equal(packageManifest.wasm, 'plugin.wasm');
 assert.equal(packageManifest.contributions.operator_ui[0].renderer, 'component_v1');
 assert.equal(packageManifest.contributions.operator_ui[0].module_entry, 'ui/health-intelligence.mjs');
 assert.equal(packageManifest.contributions.service_data[0].id, 'health-intelligence');
@@ -72,7 +73,8 @@ const evidence = {
   reference: `${source}@${expectedDigest}`,
   git_sha: process.env.GITHUB_SHA,
   workflow_run: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-  service_data_url: packageManifest.contributions.service_data[0].url,
+  service_data_component: packageManifest.contributions.service_data[0].component_adapter,
+  wasm_sha256: sha256(read('plugin-package/plugin.wasm')),
   signature: {
     policy: 'cosign-keyless',
     issuer: process.env.SIGNING_ISSUER,
