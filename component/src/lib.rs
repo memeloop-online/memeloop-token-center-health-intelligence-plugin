@@ -22,7 +22,7 @@ fn config(input: &str) -> Result<Config, String> {
     serde_json::from_value(value).map_err(|_| "invalid_config".into())
 }
 fn date(value: &Value) -> Option<String> {
-    DateTime::parse_from_rfc3339(value.as_str()?).ok().map(|v| v.to_rfc3339_opts(SecondsFormat::Millis, true))
+    DateTime::parse_from_rfc3339(value.as_str()?).ok().map(|v| v.with_timezone(&chrono::Utc).to_rfc3339_opts(SecondsFormat::Millis, true))
 }
 fn text(value: &Value) -> String {
     value.as_str().unwrap_or("").chars().map(|c| if c.is_control() { ' ' } else { c }).take(160).collect::<String>().trim().into()
@@ -135,7 +135,7 @@ fn request(url: &str, robots: bool) -> Result<(Vec<u8>, Option<String>), String>
         if robots { return Ok((vec![],None)); }
         return Err("content_type".into());
     }
-    let fetched = envelope["headers"]["date"].as_str().and_then(|v| DateTime::parse_from_rfc2822(v).ok()).map(|v| v.to_rfc3339_opts(SecondsFormat::Millis,true));
+    let fetched = envelope["headers"]["date"].as_str().and_then(|v| DateTime::parse_from_rfc2822(v).ok()).map(|v| v.with_timezone(&chrono::Utc).to_rfc3339_opts(SecondsFormat::Millis,true));
     Ok((body,fetched))
 }
 impl exports::memeloop::token_center::service_data_v1::Guest for Collector {
