@@ -65,6 +65,7 @@ export interface SnapshotServiceOptions {
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly policy?: Partial<FetchPolicy>;
   readonly cacheTtlMs?: number;
+  readonly failureCacheTtlMs?: number;
   readonly initialSnapshot?: HealthIntelligenceSnapshot;
   readonly sources?: readonly SourceSpec[];
 }
@@ -335,11 +336,17 @@ export class SnapshotService {
   private readonly options: ResolvedSnapshotOptions;
   private readonly sources: ReadonlyMap<SourceId, SourceSpec>;
   private readonly cache = new Map<SourceId, CachedSource>();
+  private readonly failures = new Map<SourceId, { until: number; snapshot: SourceSnapshot }>();
+  private readonly failureCacheTtlMs: number;
   private inFlight: Promise<HealthIntelligenceSnapshot> | null = null;
 
   constructor(options: SnapshotServiceOptions = {}) {
     this.options = optionsFor(options);
     this.sources = options.sources ? createSourceRegistry(options.sources) : SOURCE_REGISTRY;
+    this.failureCacheTtlMs = options.failureCacheTtlMs ?? 0;
+    if (!Number.isInteger(this.failureCacheTtlMs) || this.failureCacheTtlMs < 0 || this.failureCacheTtlMs > 300_000) {
+      throw new Error('failureCacheTtlMs is outside the safe range');
+    }
     if (!Number.isInteger(this.options.cacheTtlMs) || this.options.cacheTtlMs < 0 || this.options.cacheTtlMs > 60 * 60_000) {
       throw new Error('cacheTtlMs is outside the safe range');
     }
@@ -354,7 +361,7 @@ export class SnapshotService {
   }
 
   async read(force = false): Promise<HealthIntelligenceSnapshot> {
-    if (!force && this.inFlight) return this.inFlight;
+    if (this.inFlight) return this.inFlight;
     const request = this.readSources(force);
     this.inFlight = request;
     try {
@@ -377,6 +384,8 @@ export class SnapshotService {
   private async readSource(spec: SourceSpec, now: Date, force: boolean): Promise<SourceSnapshot> {
     const id = spec.source;
     const cached = this.cache.get(id);
+    const failed = this.failures.get(id);
+    if (failed && now.getTime() < failed.until) return refreshSourceStatus(failed.snapshot, now.getTime());
     if (!force && cached && now.getTime() - Date.parse(cached.fetchedAt) < this.options.cacheTtlMs) {
       return sourceSnapshot(spec, 'ok', cached.fetchedAt, cached.sourceUpdatedAt, cached.rows, 0, null, now);
     }
@@ -396,6 +405,7 @@ export class SnapshotService {
       const normalized = { ...resultRows, rows: normalizedRows(resultRows.rows) };
       const completedAt = this.options.now();
       const fetchedAt = completedAt.toISOString();
+      this.failures.delete(id);
       this.cache.set(id, {
         sourceUpdatedAt: normalized.sourceUpdatedAt,
         fetchedAt,
@@ -405,10 +415,12 @@ export class SnapshotService {
     } catch (error) {
       attempts += error instanceof SourceFetchError ? error.attempts : 0;
       const failure = publicError(error);
-      if (cached) {
-        return sourceSnapshot(spec, 'stale', cached.fetchedAt, cached.sourceUpdatedAt, cached.rows, attempts, failure.message, now);
-      }
-      return sourceSnapshot(spec, 'error', now.toISOString(), null, [], attempts, failure.message, now);
+      const completedAt = this.options.now();
+      const snapshot = cached
+        ? sourceSnapshot(spec, 'stale', cached.fetchedAt, cached.sourceUpdatedAt, cached.rows, attempts, failure.message, completedAt)
+        : sourceSnapshot(spec, 'error', completedAt.toISOString(), null, [], attempts, failure.message, completedAt);
+      this.failures.set(id, { until: completedAt.getTime() + this.failureCacheTtlMs, snapshot });
+      return snapshot;
     }
   }
 }

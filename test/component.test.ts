@@ -6,6 +6,15 @@ const url = new URL('../ui/health-intelligence.mjs', import.meta.url).href;
 const schema = JSON.parse(readFileSync(new URL('../schemas-health-intelligence.json', import.meta.url), 'utf8'));
 
 describe('signed operator UI module', () => {
+  it('keeps host failure-cache freshness and endpoint identity in the presentation contract', async () => {
+    const module = await import(url);
+    const data = { sources: [{ id: 'radar', status: 'ok', rows: [] }] };
+    const provenance = { plugin_id: 'mtc-health-intelligence', endpoint_id: 'health-intelligence', freshness: 'stale' };
+    expect(module.runtimeSnapshot({ data, partial: true, provenance }).sources[0].status).toBe('stale');
+    expect(data.sources[0]?.status).toBe('ok');
+    expect(module.runtimeSnapshot({ data, partial: true, provenance: { ...provenance, freshness: 'unavailable' } }).sources[0].status).toBe('error');
+    expect(() => module.runtimeSnapshot({ data, provenance: { ...provenance, plugin_id: 'other' } })).toThrow();
+  });
   it('activates using host React and Fluent and exposes the manifest component', async () => {
     const module = await import(url);
     const componentPackage = module.activateOperatorUi({
