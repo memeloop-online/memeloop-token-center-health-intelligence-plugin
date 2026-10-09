@@ -11,3 +11,4 @@ coverage/
 /plugin.wasm
 /component-snapshot.json
 /component-build.json
+/component-bounds.json

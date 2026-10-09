@@ -59,7 +59,8 @@ assert.match(installerTrust.host_contract_revision, /^[0-9a-f]{40}$/);
 assert.equal(installerTrust.installer_repository, 'ghcr.io/memeloop-online/memeloop-token-center-plugin-installer');
 assert.match(installerTrust.installer_digest, /^sha256:[0-9a-f]{64}$/);
 assert.match(installerTrust.installer_source_revision, /^[0-9a-f]{40}$/);
-assert.equal(installerTrust.minimum_installer_contract_revision, 'd21f73377f96197fea9f0c34b7a93836458d81af');
+assert.equal(installerTrust.minimum_installer_contract_revision, installerTrust.host_contract_revision);
+assert.equal(installerTrust.installer_verification_run, 'https://github.com/memeloop-online/memeloop-token-center/actions/runs/37914361285');
 assert.equal(installerTrust.cosign_version, 'v3.1.3-mtc.3');
 
 const sources = read('src/server/sources.ts');
@@ -134,11 +135,32 @@ if (installerRoot) {
   const contributions = installerManifestSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned installer schema lacks service_data');
   assert(contributions?.operator_ui, 'pinned installer schema lacks operator_ui');
+  const serviceContract = contributions.service_data.items;
+  assert(serviceContract.properties?.component_adapter, 'pinned installer lacks component_adapter');
+  assert(!serviceContract.required.includes('url'), 'pinned installer still requires URL collection');
+  assert.deepEqual(serviceContract.oneOf, [
+    { required: ['url'], not: { required: ['component_adapter'] } },
+    { required: ['component_adapter'], not: { required: ['url'] } },
+  ], 'installer must require exactly one supported collector');
+  assert.equal(read('wit/token-center.wit'), readFileSync(join(installerRoot, 'wit/token-center.wit'), 'utf8'),
+    'installer ABI must match the component WIT');
   assert(contributions.operator_ui.items?.properties?.renderer?.enum?.includes('component_v1'),
     'pinned installer schema lacks component_v1');
 
   const pluginSource = readFileSync(join(installerRoot, 'src/plugin.rs'), 'utf8');
   assert(pluginSource.includes('"component_v1"'), 'pinned installer runtime lacks component_v1');
+  assert(pluginSource.includes('const PLUGIN_FUEL: u64 = 5_000_000;'));
+  assert(pluginSource.includes('const PLUGIN_MEMORY_BYTES: usize = 32 * 1024 * 1024;'));
+  assert(pluginSource.includes('const PLUGIN_TABLE_ELEMENTS: usize = 100_000;'));
+  assert(pluginSource.includes('const PLUGIN_EPOCH_TICK: Duration = Duration::from_millis(10);'));
+  const execution = readFileSync(join(installerRoot, 'src/plugin/service_data.rs'), 'utf8');
+  for (const bound of ['.memory_size(PLUGIN_MEMORY_BYTES)', '.table_elements(PLUGIN_TABLE_ELEMENTS)',
+    '.instances(8)', '.tables(2)', '.memories(2)', 'store.set_fuel(self.fuel)',
+    'store.set_epoch_deadline(epoch_deadline_ticks(timeout))', 'Duration::from_millis(endpoint.timeout_millis)']) {
+    assert(execution.includes(bound), `pinned host execution bounds changed: ${bound}`);
+  }
+  assert(readFileSync(join(installerRoot, 'Cargo.toml'), 'utf8').includes('version = "0.49.9"'),
+    'contract validator must use the official pinned validator version');
   assert(pluginSource.includes('validate_service_data_contributions(manifest)?'),
     'pinned installer runtime lacks authoritative service_data validation');
 

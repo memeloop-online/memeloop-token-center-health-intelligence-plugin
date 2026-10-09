@@ -40,7 +40,7 @@ jobs:
         run: |
           cargo build --release --target wasm32-unknown-unknown -p mtc-health-component
           cargo run --release -p health-componentize
-          cargo run --release -p health-host-harness
+          cargo run --release -p health-host-harness --bin health-host-harness
           node scripts/verify-component.mjs
       - name: Check out the current MTC host contract
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: memeloop-online/memeloop-token-center
-          ref: c8b68028a21e80a610b74ee3c41b442a69b84f97
+          ref: b1b0a01d2adcae6f94d7c51a228ff249a65cfdd3
           path: mtc-installer-contract
           fetch-depth: 0
           persist-credentials: false
@@ -64,10 +64,12 @@ jobs:
           minimum_revision=$(node -p "require('./release/installer-trust.json').minimum_installer_contract_revision")
           git -C "$GITHUB_WORKSPACE/mtc-installer-contract" merge-base --is-ancestor \
             "$minimum_revision" \
-            c8b68028a21e80a610b74ee3c41b442a69b84f97
+            b1b0a01d2adcae6f94d7c51a228ff249a65cfdd3
           node scripts/verify-static.mjs \
             "$GITHUB_WORKSPACE/mtc-core" \
             "$GITHUB_WORKSPACE/mtc-installer-contract"
+          cargo run --release -p health-host-harness --bin health-contract-verify -- \
+            "$GITHUB_WORKSPACE/mtc-core" "$GITHUB_WORKSPACE/mtc-installer-contract"
       - name: Create review package
         run: npm pack --ignore-scripts --pack-destination dist
       - name: Upload review package
@@ -79,6 +81,7 @@ jobs:
             plugin.wasm
             plugin.json
             component-build.json
+            component-bounds.json
             Cargo.lock
           if-no-files-found: error
           retention-days: 14
