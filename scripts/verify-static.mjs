@@ -100,6 +100,8 @@ const coreRoot = process.argv[2];
 if (coreRoot) {
   assert.equal(execFileSync('git', ['-C', coreRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     installerTrust.host_contract_revision, 'host checkout differs from the reviewed trust revision');
+  assert.equal(read('wit/token-center.wit'), readFileSync(join(coreRoot, 'wit/token-center.wit'), 'utf8'),
+    'component WIT must match the exact pinned host ABI');
   const coreSchema = JSON.parse(readFileSync(join(coreRoot, 'schemas/plugin-manifest.schema.json'), 'utf8'));
   const contributions = coreSchema.properties?.contributions?.properties;
   assert(contributions?.service_data, 'pinned MTC schema lacks service_data');

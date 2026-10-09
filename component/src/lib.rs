@@ -102,15 +102,16 @@ fn robots_allowed(body: &str, path: &str) -> bool {
     let mut best: Option<(usize,bool)> = None;
     for line in body.lines().take(2000) {
         let line = line.split('#').next().unwrap_or("").trim();
-        if line.is_empty() { active = false; directives = false; continue; }
+        if line.is_empty() { continue; }
         let Some((name,value)) = line.split_once(':') else { continue; };
         let name = name.trim().to_ascii_lowercase();
         let value = value.trim();
         if name == "user-agent" {
             if directives { active = false; directives = false; }
             active |= value == "*";
-        } else if active && (name == "allow" || name == "disallow") {
+        } else {
             directives = true;
+            if !active || (name != "allow" && name != "disallow") { continue; }
             if !value.is_empty() && path.starts_with(value) {
                 let allowed = name == "allow";
                 if best.is_none_or(|(len,yes)| value.len() > len || (value.len() == len && allowed && !yes)) { best = Some((value.len(),allowed)); }
