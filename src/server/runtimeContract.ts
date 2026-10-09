@@ -34,7 +34,7 @@ export function runtimeSources(config: RuntimeConfiguration, authority: RuntimeA
     || !Array.isArray(config.sources) || config.sources.length === 0) {
     throw new Error('invalid health runtime authority or configuration');
   }
-  const sources = config.sources.map((source): SourceSpec => {
+  const sources = config.sources.map((source: RuntimeSource): SourceSpec => {
     if (!Object.hasOwn(NORMALIZERS, source.normalizer)
       || typeof source.label !== 'string' || source.label.length === 0 || source.label.length > 120
       || !authority.allowedOrigins.includes(new URL(source.endpoint).origin)) {
