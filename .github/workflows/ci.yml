@@ -38,9 +38,9 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: Build and execute the real service-data component
         run: |
-          cargo build --release --target wasm32-unknown-unknown -p mtc-health-component
-          cargo run --release -p health-componentize
-          cargo run --release -p health-host-harness --bin health-host-harness
+          cargo build --locked --release --target wasm32-unknown-unknown -p mtc-health-component
+          cargo run --locked --release -p health-componentize
+          cargo run --locked --release -p health-host-harness --bin health-host-harness
           node scripts/verify-component.mjs
       - name: Check out the current MTC host contract
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -68,7 +68,7 @@ jobs:
           node scripts/verify-static.mjs \
             "$GITHUB_WORKSPACE/mtc-core" \
             "$GITHUB_WORKSPACE/mtc-installer-contract"
-          cargo run --release -p health-host-harness --bin health-contract-verify -- \
+          cargo run --locked --release -p health-host-harness --bin health-contract-verify -- \
             "$GITHUB_WORKSPACE/mtc-core" "$GITHUB_WORKSPACE/mtc-installer-contract"
       - name: Create review package
         run: npm pack --ignore-scripts --pack-destination dist

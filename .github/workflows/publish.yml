@@ -48,9 +48,9 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: Build and execute the real service-data component
         run: |
-          cargo build --release --target wasm32-unknown-unknown -p mtc-health-component
-          cargo run --release -p health-componentize
-          cargo run --release -p health-host-harness --bin health-host-harness
+          cargo build --locked --release --target wasm32-unknown-unknown -p mtc-health-component
+          cargo run --locked --release -p health-componentize
+          cargo run --locked --release -p health-host-harness --bin health-host-harness
           node scripts/verify-component.mjs
       - name: Collect the release API snapshot using the built collector
         run: npm run snapshot
@@ -98,7 +98,7 @@ jobs:
           node scripts/verify-static.mjs \
             "$GITHUB_WORKSPACE/mtc-core" \
             "$GITHUB_WORKSPACE/mtc-installer-contract"
-          cargo run --release -p health-host-harness --bin health-contract-verify -- \
+          cargo run --locked --release -p health-host-harness --bin health-contract-verify -- \
             "$GITHUB_WORKSPACE/mtc-core" "$GITHUB_WORKSPACE/mtc-installer-contract"
       - name: Install ORAS
         uses: oras-project/setup-oras@ccb71166b124a8452d1b72c4476398a909ed4d63 # main (reviewed immutable commit)
