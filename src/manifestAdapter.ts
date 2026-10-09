@@ -11,7 +11,7 @@ export const HEALTH_INTELLIGENCE_SERVICE_URL = 'https://memeloop-online.github.i
 
 export interface HealthIntelligenceServiceDataContribution {
   readonly id: typeof HEALTH_INTELLIGENCE_ENDPOINT_ID;
-  readonly url: typeof HEALTH_INTELLIGENCE_SERVICE_URL;
+  readonly componentAdapter: Record<string, unknown>;
   readonly requiredScope: 'metrics:read';
   readonly responseSchema: Record<string, unknown>;
   readonly fallback: Record<string, unknown>;
@@ -89,7 +89,10 @@ function serviceData(value: unknown): HealthIntelligenceServiceDataContribution 
   const candidate = object(value);
   if (!candidate
     || candidate.id !== HEALTH_INTELLIGENCE_ENDPOINT_ID
-    || !exactServiceUrl(candidate.url)
+    || candidate.url !== undefined
+    || object(candidate.component_adapter)?.api_version !== 'component-v1'
+    || object(candidate.component_adapter)?.collector !== 'health-three-source-v1'
+    || object(candidate.component_adapter)?.normalizer !== 'health-snapshot-v1'
     || candidate.required_scope !== 'metrics:read'
     || candidate.cache_ttl_seconds !== 300
     || candidate.timeout_millis !== 4_000
@@ -98,7 +101,7 @@ function serviceData(value: unknown): HealthIntelligenceServiceDataContribution 
   }
   return {
     id: HEALTH_INTELLIGENCE_ENDPOINT_ID,
-    url: HEALTH_INTELLIGENCE_SERVICE_URL,
+    componentAdapter: candidate.component_adapter as Record<string, unknown>,
     requiredScope: 'metrics:read',
     responseSchema: responseSchema(candidate.response_schema),
     fallback: fallback(candidate.fallback),

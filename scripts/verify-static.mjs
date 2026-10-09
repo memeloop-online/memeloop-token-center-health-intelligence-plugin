@@ -12,12 +12,12 @@ const reviewedSchema = json('schemas-health-intelligence.json');
 const installerTrust = json('release/installer-trust.json');
 
 assert.equal(manifest.id, 'mtc-health-intelligence');
-assert.equal(manifest.version, '1.1.0');
+assert.equal(manifest.version, '1.2.0');
 assert.equal(manifest.wit_version, '0.2.0');
-assert.equal(manifest.wasm, null);
+assert.equal(manifest.wasm, 'plugin.wasm');
 assert.deepEqual(manifest.capabilities, [{
   kind: 'http',
-  allowed_origins: ['https://memeloop-online.github.io'],
+  allowed_origins: ['https://codexradar.com', 'https://deepswe.datacurve.ai', 'https://cdk.aixhan.com'],
 }]);
 assert.equal(manifest.contributions.traffic_policy, false);
 assert.equal(manifest.contributions.request_rewrite, false);
@@ -28,7 +28,8 @@ assert.equal(manifest.contributions.operator_ui.length, 1);
 
 const endpoint = manifest.contributions.service_data[0];
 assert.equal(endpoint.id, 'health-intelligence');
-assert.equal(endpoint.url, 'https://memeloop-online.github.io/memeloop-token-center-health-intelligence-plugin/api/health-intelligence.json');
+assert.equal(endpoint.url, undefined);
+assert.deepEqual(endpoint.component_adapter, { api_version: 'component-v1', collector: 'health-three-source-v1', normalizer: 'health-snapshot-v1', config: json('component/sources.json') });
 assert.equal(endpoint.required_scope, 'metrics:read');
 assert.deepEqual(endpoint.response_schema, reviewedSchema);
 assert.equal(endpoint.cache_ttl_seconds, 300);

@@ -1,0 +1,34 @@
+{
+  "sources": [
+    {
+      "source": "codexradar",
+      "label": "Codex Radar 模型能力",
+      "pageUrl": "https://codexradar.com/",
+      "endpoint": "https://codexradar.com/api/radar-insights",
+      "robotsUrl": "https://codexradar.com/robots.txt",
+      "dataPath": "/api/radar-insights",
+      "maxObservationAgeSeconds": 604800,
+      "normalizer": "codexradar_v1"
+    },
+    {
+      "source": "deepswe",
+      "label": "DeepSWE 工程能力",
+      "pageUrl": "https://deepswe.datacurve.ai/",
+      "endpoint": "https://deepswe.datacurve.ai/artifacts/v1.1/leaderboard-live.json",
+      "robotsUrl": "https://deepswe.datacurve.ai/robots.txt",
+      "dataPath": "/artifacts/v1.1/leaderboard-live.json",
+      "maxObservationAgeSeconds": 2592000,
+      "normalizer": "deepswe_v1"
+    },
+    {
+      "source": "aixhan",
+      "label": "CDK 模型健康",
+      "pageUrl": "https://cdk.aixhan.com/model-health",
+      "endpoint": "https://cdk.aixhan.com/api/public/check-cx/dashboard",
+      "robotsUrl": "https://cdk.aixhan.com/robots.txt",
+      "dataPath": "/api/public/check-cx/dashboard",
+      "maxObservationAgeSeconds": 1200,
+      "normalizer": "aixhan_v1"
+    }
+  ]
+}

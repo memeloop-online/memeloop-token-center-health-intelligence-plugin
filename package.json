@@ -1,6 +1,6 @@
 {
   "name": "@memeloop/mtc-health-intelligence",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MTC model health and intelligence: extensible public feeds and signed operator UI",
   "type": "module",
   "engines": {
@@ -12,7 +12,9 @@
     "plugin.json",
     "schemas-health-intelligence.json",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "plugin.wasm",
+    "component-build.json"
   ],
   "exports": {
     "./server": "./dist/server/server/index.js",
