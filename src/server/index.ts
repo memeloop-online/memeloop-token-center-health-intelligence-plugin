@@ -5,3 +5,4 @@ export * from './normalizers.js';
 export * from './publishedSnapshot.js';
 export * from './security.js';
 export * from './sources.js';
+export * from './runtimeContract.js';

@@ -28,6 +28,10 @@ The schema and UI accept new source IDs and flat scalar row fields. Existing ben
 
 ## Run and publish
 
+The [service-data runtime contract](docs/service-data-runtime.md) describes the
+configuration-driven collector API, authority boundary, failure cache and the
+remaining component integration. The installed release still uses Pages.
+
 CI installs the lockfile and runs type checking, fixture tests, and the collector build. The `publish plugin` workflow builds once, collects the Pages snapshot, signs the OCI package, and verifies an installation with the official MTC installer. GitHub Release archives reuse those package and snapshot bytes and include checksums and signature evidence.
 
 The same collector supports a Node service through `npm run serve`, exposing `GET /api/health-intelligence`. Source fetches have a four-second timeout, two retries, and a five-minute memory cache.

@@ -24,6 +24,30 @@ export function snapshotSources(value) {
   return value.sources;
 }
 
+export function runtimeSnapshot(response, now = Date.now()) {
+  const provenance = response && response.provenance;
+  if (!provenance || provenance.plugin_id !== PLUGIN_ID || provenance.endpoint_id !== ENDPOINT_ID) {
+    throw new Error('Health data could not be verified');
+  }
+  let freshness = provenance.freshness;
+  if (freshness === undefined) {
+    const fetched = provenance.fetched_at;
+    freshness = provenance.source === 'fallback' ? 'unavailable'
+      : response.partial || provenance.source === 'stale_cache'
+        || !Number.isFinite(fetched) || fetched > now + MAX_CLOCK_SKEW_MS
+        || now - fetched > STALE_FETCH_AGE_MS ? 'stale' : 'fresh';
+  }
+  if (!['fresh', 'stale', 'unavailable'].includes(freshness)) {
+    throw new Error('Health data could not be verified');
+  }
+  const data = response.data;
+  const sources = snapshotSources(data);
+  if (!response.partial && freshness === 'fresh') return data;
+  return { ...data, sources: sources.map((source) => ({ ...source,
+    status: source.status === 'error' || freshness === 'unavailable' ? 'error' : 'stale',
+  })) };
+}
+
 const STRINGS = {
   title: { en: 'Model health & intelligence', zh: '模型健康与能力' },
   refresh: { en: 'Refresh', zh: '刷新' },
@@ -210,8 +234,7 @@ export function activateOperatorUi(host) {
       setRefreshing(true);
       props.api.loadServiceData(ENDPOINT_ID, controller.signal).then((response) => {
         if (!active) return;
-        const data = response && response.data;
-        snapshotSources(data);
+        const data = runtimeSnapshot(response);
         setSnapshot(data);
         setFailure(null);
         setInitialLoading(false);
